@@ -3,6 +3,7 @@ from django.urls import include, path
 from rest_framework import routers
 
 from aktenverwaltung.views import AkteViewSet, DashboardView
+from finanzen.views import ZahlungspositionViewSet
 from organizer.views import AufgabeViewSet, FristViewSet, NotizViewSet
 
 router = routers.DefaultRouter()
@@ -10,6 +11,7 @@ router.register(r"akten", AkteViewSet, basename="akte")
 router.register(r"aufgaben", AufgabeViewSet, basename="aufgabe")
 router.register(r"fristen", FristViewSet, basename="frist")
 router.register(r"notizen", NotizViewSet, basename="notiz")
+router.register(r"zahlungen", ZahlungspositionViewSet, basename="zahlung")
 
 urlpatterns = [
     path("admin/", admin.site.urls),

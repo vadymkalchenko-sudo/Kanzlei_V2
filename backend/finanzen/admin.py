@@ -5,6 +5,6 @@ from .models import Zahlungsposition
 
 @admin.register(Zahlungsposition)
 class ZahlungspositionAdmin(admin.ModelAdmin):
-    list_display = ("akte", "status", "betrag_soll", "betrag_haben", "faellig_am")
+    list_display = ("akte", "status", "betrag", "beschreibung", "datum")
     list_filter = ("status",)
     search_fields = ("akte__aktenzeichen",)
