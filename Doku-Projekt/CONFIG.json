@@ -1,0 +1,17 @@
+{
+  "api_base_url": "http://localhost:8000/api/",
+  "backend_port": 8000,
+  "frontend_port": 3000,
+  "environment_variables_needed": [
+    "POSTGRES_DB",
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "KANZELEI_DOCS_ROOT"
+  ],
+  "database_connection": {
+    "driver": "PostgreSQL",
+    "version_min": "14+",
+    "jsonb_support": true,
+    "user_defined_location": true
+  }
+}

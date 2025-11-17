@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: kms_db
+          POSTGRES_USER: kms_user
+          POSTGRES_PASSWORD: kms_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U kms_user -d kms_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      POSTGRES_DB: kms_db
+      POSTGRES_USER: kms_user
+      POSTGRES_PASSWORD: kms_password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      DJANGO_SECRET_KEY: ci-secret
+      DJANGO_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run migrations
+        run: |
+          cd backend
+          python manage.py migrate --noinput
+      - name: Run tests
+        run: |
+          cd backend
+          pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps
+        run: |
+          cd frontend
+          npm install
+      - name: Lint
+        run: |
+          cd frontend
+          npm run lint
+      - name: Build
+        env:
+          VITE_API_BASE_URL: http://localhost:8000/api/
+        run: |
+          cd frontend
+          npm run build
+

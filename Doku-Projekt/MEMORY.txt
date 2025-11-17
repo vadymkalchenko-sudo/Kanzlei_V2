@@ -1,0 +1,7 @@
+[2025-09-17] Die Zugangsdateien (Credentials) für die Datenbank MÜSSEN gesondert behandelt werden (über Environment Variables), um Konflikte zwischen den Arbeitsplätzen zu vermeiden.
+
+[2025-10-03] Die Datenbankstruktur der flexiblen Daten muss als JSONB implementiert werden. Der aktuelle Fehler ist: Die Verbindung ist sauber, aber das Schreiben in die Datenbank ist nicht möglich.
+
+[2025-11-17] Die Konfliktprüfung (Mandant vs. Gegner in offenen Akten) ist eine harte Geschäftsregel.
+
+[2025-11-17] Akten müssen revisionssicher sein: Beim Statuswechsel auf 'Geschlossen' muss ein historischer Snapshot (Kopie der relevanten Stammdaten) in die JSONB-Felder der Akte erfolgen (Freezing State).
