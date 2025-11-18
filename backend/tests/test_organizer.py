@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 
 from aktenverwaltung.models import Akte, Gegner, Mandant
 from organizer.models import Aufgabe, Frist
+from security.models import Profile
 
 
 @pytest.mark.django_db
@@ -51,6 +52,8 @@ def test_dashboard_priorisiert_fristen():
     Aufgabe.objects.create(akte=akte, titel="Offene Aufgabe")
 
     user = get_user_model().objects.create_user(username="tester", password="secret")
+    # Füge das Profil mit minimaler Rolle hinzu
+    Profile.objects.create(user=user, role='BETRACHTER')
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -62,4 +65,3 @@ def test_dashboard_priorisiert_fristen():
     assert data["fristen_heute"] == 2
     first_entry = data["priorisierte_fristen"][0]
     assert first_entry["bezeichnung"] == "Früh & hoch"
-

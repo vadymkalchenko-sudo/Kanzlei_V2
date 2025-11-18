@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from .models import Aufgabe, Frist, Notiz
 from .serializers import AufgabeSerializer, FristSerializer, NotizSerializer
 
+from aktenverwaltung.permissions import IsAdminOrReadWriteUser
+
 
 class AufgabeViewSet(viewsets.ModelViewSet):
     queryset = Aufgabe.objects.select_related("akte")
@@ -28,7 +30,7 @@ class NotizViewSet(viewsets.ModelViewSet):
 
 
 class DashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrReadWriteUser]  # Geändert von IsAuthenticated zu IsAdminOrReadWriteUser
 
     def get(self, request):
         today = timezone.now().date()
@@ -48,7 +50,7 @@ class DashboardView(APIView):
 
         priorisierte_fristen = [
             {
-                "akte_id": frist.akte_id,
+                "akte_id": frist.akte.id,  # Geändert von frist.akte_id zu frist.akte.id
                 "aktenzeichen": frist.akte.aktenzeichen,
                 "bezeichnung": frist.bezeichnung,
                 "frist_datum": frist.frist_datum,

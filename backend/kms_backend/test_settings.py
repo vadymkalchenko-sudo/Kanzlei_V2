@@ -17,11 +17,13 @@ PASSWORD_HASHERS = [
 REST_FRAMEWORK = getattr(globals(), 'REST_FRAMEWORK', {}).copy()
 REST_FRAMEWORK.update({
     # Override default authentication classes if needed for testing
+    # Added SessionAuthentication back to make force_authenticate work more reliably with test clients
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",  # Added JWT authentication
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.IsAuthenticated", # Ensures 401 for unauthenticated requests when no token is present
     ],
 })

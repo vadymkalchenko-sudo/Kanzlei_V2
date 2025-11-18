@@ -5,8 +5,9 @@ from django.contrib.auth.models import User
 class Profile(models.Model):
     ROLE_CHOICES = [
         ('ADMIN', 'Administrator'),
-        ('SACHBEARBEITER', 'Sachbearbeiter'),
-        ('MANDANT', 'Mandant'),
+        ('POWERUSER', 'Power User'),
+        ('USER', 'Benutzer'),
+        ('BETRACHTER', 'Betrachter'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
