@@ -3,19 +3,21 @@ import logging
 import logging
 
 from django.db.models import Case, IntegerField, OuterRef, Q, Subquery, When
+from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ViewSet
 
 from organizer.models import Aufgabe, Frist
 
 from .db_connector import write_akte_data
-from .models import Akte, Dokument
+from .models import Akte, Dokument, Mandant, Gegner
 from .permissions import IsAdminOrReadWriteUser
-from .serializers import AkteDashboardSerializer, AkteSerializer, DokumentSerializer
+from .serializers import AkteDashboardSerializer, AkteSerializer, DokumentSerializer, MandantSerializer, GegnerSerializer
 from .storage import store_document
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,36 @@ class AkteViewSet(viewsets.ModelViewSet):
             )
 
         serializer.save()
+
+    @action(detail=False, methods=["get"], url_path="next_aktenzeichen")
+    def next_aktenzeichen(self, request):
+        """
+        Berechnet das nächste Aktenzeichen im Format NNNN.YY.awr
+        """
+        from datetime import datetime
+        
+        # Aktuelles Jahr (letzte 2 Ziffern)
+        current_year = str(datetime.now().year)[-2:]
+        
+        # Finde die höchste Nummer für das aktuelle Jahr
+        max_num = 0
+        akten = Akte.objects.filter(aktenzeichen__endswith=f".{current_year}.awr")
+        
+        for akte in akten:
+            parts = akte.aktenzeichen.split('.')
+            if len(parts) >= 2 and parts[1] == current_year:
+                try:
+                    num = int(parts[0])
+                    if num > max_num:
+                        max_num = num
+                except ValueError:
+                    continue
+        
+        # Nächstes Aktenzeichen ist die nächste Nummer
+        next_num = max_num + 1
+        next_aktenzeichen = f"{next_num:04d}.{current_year}.awr"
+        
+        return Response({"next_aktenzeichen": next_aktenzeichen})
 
     @action(detail=False, methods=["get"], url_path="priorisierung")
     def priorisierte_akten(self, request):
@@ -84,7 +116,7 @@ class AkteViewSet(viewsets.ModelViewSet):
             logger.error("JSONB-Schreibfehler für Akte %s: %s", akte.id, error)
             return Response(
                 {"detail": error or "Schreiben fehlgeschlagen."},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_40_BAD_REQUEST,
             )
 
         return Response(
@@ -105,7 +137,7 @@ class AkteViewSet(viewsets.ModelViewSet):
         if upload is None:
             return Response(
                 {"detail": "datei ist erforderlich."},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_40_BAD_REQUEST,
             )
 
         relative_path = store_document(akte, upload)
@@ -119,12 +151,117 @@ class AkteViewSet(viewsets.ModelViewSet):
         serializer = DokumentSerializer(dokument)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["get"], url_path="dokumente/(?P<doc_pk>[^/.]+)/download")
+    def download_dokument(self, request, pk=None, doc_pk=None):
+        """
+        Gesicherte Download-API für Dokumente
+        """
+        akte = self.get_object()
+        try:
+            dokument = akte.dokumente.get(pk=doc_pk)
+        except Dokument.DoesNotExist:
+            return Response(
+                {"detail": "Dokument nicht gefunden."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        # Dateipfad sicherheitshalber validieren
+        import os
+        from django.conf import settings
+        
+        # Konstruiere den vollständigen Dateipfad
+        file_path = os.path.join(settings.MEDIA_ROOT, dokument.pfad_auf_server)
+        
+        # Sicherheitsüberprüfung: Stelle sicher, dass der Dateipfad innerhalb des MEDIA_ROOT ist
+        file_path = os.path.abspath(file_path)
+        media_root = os.path.abspath(settings.MEDIA_ROOT)
+        
+        if not file_path.startswith(media_root):
+            return Response(
+                {"detail": "Ungültiger Dateipfad."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Überprüfen, ob die Datei existiert
+        if not os.path.exists(file_path):
+            return Response(
+                {"detail": "Datei existiert nicht."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        # Datei als Download bereitstellen
+        response = FileResponse(
+            open(file_path, 'rb'),
+            as_attachment=True,
+            filename=dokument.dateiname
+        )
+        return response
+
     def _has_conflict(self, validated_data):
         mandant = validated_data.get("mandant")
         if not mandant:
             return False
 
         return Akte.objects.filter(status="Offen", gegner_id=mandant.id).exists()
+
+
+class AdressbuchViewSet(ViewSet):
+    """
+    ViewSet für die Adressbuch-Suche über Mandant und Gegner
+    """
+    permission_classes = [IsAdminOrReadWriteUser]
+
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        """
+        Such-API über Mandant und Gegner zur Unterstützung der Übernahme-Funktion
+        """
+        query = request.query_params.get('q', '')
+        
+        if query:
+            # Suche in Mandanten und Gegnern
+            mandanten = Mandant.objects.filter(
+                Q(name__icontains=query) | 
+                Q(email__icontains=query) | 
+                Q(telefon__icontains=query)
+            )
+            gegner = Gegner.objects.filter(
+                Q(name__icontains=query) | 
+                Q(email__icontains=query) | 
+                Q(telefon__icontains=query)
+            )
+        else:
+            mandanten = Mandant.objects.all()
+            gegner = Gegner.objects.all()
+        
+        # Kombiniere Ergebnisse und serialisiere
+        results = []
+        for mandant in mandanten:
+            results.append({
+                'id': mandant.pk, # Verwende pk statt id
+                'name': mandant.name,
+                'adresse': mandant.adresse,
+                'telefon': mandant.telefon,
+                'email': mandant.email,
+                'typ': mandant.typ,
+                'model_type': 'mandant'
+            })
+        
+        for gegner in gegner:
+            results.append({
+                'id': gegner.pk,  # Verwende pk statt id
+                'name': gegner.name,
+                'adresse': gegner.adresse,
+                'telefon': gegner.telefon,
+                'email': gegner.email,
+                'typ': gegner.typ,
+                'model_type': 'gegner'
+            })
+        
+        # Sortiere nach Name
+        results = sorted(results, key=lambda x: x['name'])
+        
+        return Response(results)
 
 
 class DashboardView(APIView):

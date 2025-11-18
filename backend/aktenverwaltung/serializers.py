@@ -1,6 +1,38 @@
 from rest_framework import serializers
 
-from .models import Akte, Dokument
+from .models import Akte, Dokument, Mandant, Gegner
+
+
+class MandantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Mandant
+        fields = [
+            "id",
+            "name",
+            "adresse",
+            "bankverbindung",
+            "telefon",
+            "email",
+            "typ",
+            "erstellt_am",
+            "aktualisiert_am",
+        ]
+
+
+class GegnerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Gegner
+        fields = [
+            "id",
+            "name",
+            "adresse",
+            "bankverbindung",
+            "telefon",
+            "email",
+            "typ",
+            "erstellt_am",
+            "aktualisiert_am",
+        ]
 
 
 class AkteSerializer(serializers.ModelSerializer):
@@ -47,4 +79,3 @@ class DokumentSerializer(serializers.ModelSerializer):
             "erstellt_am",
         ]
         read_only_fields = ("pfad_auf_server", "erstellt_am")
-
