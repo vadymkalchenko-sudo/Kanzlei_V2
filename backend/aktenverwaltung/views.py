@@ -23,6 +23,19 @@ from .storage import store_document
 logger = logging.getLogger(__name__)
 
 
+
+class MandantViewSet(viewsets.ModelViewSet):
+    queryset = Mandant.objects.all()
+    serializer_class = MandantSerializer
+    permission_classes = [IsAdminOrReadWriteUser]
+
+
+class GegnerViewSet(viewsets.ModelViewSet):
+    queryset = Gegner.objects.all()
+    serializer_class = GegnerSerializer
+    permission_classes = [IsAdminOrReadWriteUser]
+
+
 class AkteViewSet(viewsets.ModelViewSet):
     queryset = Akte.objects.select_related("mandant", "gegner").all()
     serializer_class = AkteSerializer
@@ -202,7 +215,7 @@ class AkteViewSet(viewsets.ModelViewSet):
         if not mandant:
             return False
 
-        return Akte.objects.filter(status="Offen", gegner_id=mandant.id).exists()
+        return Akte.objects.filter(status="Offen", gegner__name=mandant.name).exists()
 
 
 class AdressbuchViewSet(ViewSet):

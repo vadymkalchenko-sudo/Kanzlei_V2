@@ -6,12 +6,14 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-from aktenverwaltung.views import AkteViewSet, DashboardView
+from aktenverwaltung.views import AkteViewSet, DashboardView, MandantViewSet, GegnerViewSet
 from finanzen.views import ZahlungspositionViewSet
 from organizer.views import AufgabeViewSet, FristViewSet, NotizViewSet
 
 router = routers.DefaultRouter()
 router.register(r"akten", AkteViewSet, basename="akte")
+router.register(r"mandanten", MandantViewSet, basename="mandant")
+router.register(r"gegner", GegnerViewSet, basename="gegner")
 router.register(r"aufgaben", AufgabeViewSet, basename="aufgabe")
 router.register(r"fristen", FristViewSet, basename="frist")
 router.register(r"notizen", NotizViewSet, basename="notiz")
