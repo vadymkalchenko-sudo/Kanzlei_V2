@@ -15,24 +15,19 @@ const Login = () => {
         setError('');
 
         try {
-            if (username === 'testuser' && password === 'testpasswort') {
-                setTimeout(() => {
-                    localStorage.setItem('token', 'mock-token');
-                    navigate('/dashboard');
-                }, 500);
-            } else {
-                const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-                const API_BASE_URL: string =
-                    typeof envBaseUrl === "string" && envBaseUrl.length > 0
-                        ? envBaseUrl
-                        : "http://localhost:8000/api/";
+            const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
+            const API_BASE_URL: string =
+                typeof envBaseUrl === "string" && envBaseUrl.length > 0
+                    ? envBaseUrl
+                    : "http://localhost:8000/api/";
 
-                await axios.post(`${API_BASE_URL}token/`, {
-                    username,
-                    password
-                });
-                navigate('/dashboard');
-            }
+            const response = await axios.post(`${API_BASE_URL}token/`, {
+                username,
+                password
+            });
+
+            localStorage.setItem('token', response.data.access);
+            navigate('/dashboard');
         } catch (err) {
             setError('Ungültige Anmeldedaten. Bitte versuchen Sie es erneut.');
             setLoading(false);

@@ -35,9 +35,25 @@ class GegnerSerializer(serializers.ModelSerializer):
         ]
 
 
+class DokumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Dokument
+        fields = [
+            "id",
+            "akte",
+            "titel",
+            "dateiname",
+            "pfad_auf_server",
+            "datum",
+            "erstellt_am",
+        ]
+        read_only_fields = ("pfad_auf_server", "erstellt_am")
+
+
 class AkteSerializer(serializers.ModelSerializer):
     mandant = MandantSerializer()
     gegner = GegnerSerializer()
+    dokumente = DokumentSerializer(many=True, read_only=True)
     
     class Meta:
         model = Akte
@@ -50,7 +66,9 @@ class AkteSerializer(serializers.ModelSerializer):
             "info_zusatz",
             "mandant_historie",
             "gegner_historie",
+            "gegner_historie",
             "dokumenten_pfad_root",
+            "dokumente",
             "erstellt_am",
             "aktualisiert_am",
         ]
@@ -106,17 +124,3 @@ class AkteDashboardSerializer(AkteSerializer):
 
     class Meta(AkteSerializer.Meta):
         fields = AkteSerializer.Meta.fields + ["naechste_frist", "naechste_prioritaet"]
-
-
-class DokumentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Dokument
-        fields = [
-            "id",
-            "akte",
-            "titel",
-            "dateiname",
-            "pfad_auf_server",
-            "erstellt_am",
-        ]
-        read_only_fields = ("pfad_auf_server", "erstellt_am")

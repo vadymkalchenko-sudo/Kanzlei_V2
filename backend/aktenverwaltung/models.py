@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 class ZeitstempelModell(models.Model):
@@ -93,6 +94,7 @@ class Dokument(ZeitstempelModell):
     titel = models.CharField(max_length=255)
     dateiname = models.CharField(max_length=255)
     pfad_auf_server = models.CharField(max_length=512)
+    datum = models.DateField(default=timezone.now)
 
     def __str__(self):
         return f"{self.akte.aktenzeichen} - {self.titel}"

@@ -41,6 +41,13 @@ class AkteViewSet(viewsets.ModelViewSet):
     serializer_class = AkteSerializer
     permission_classes = [IsAdminOrReadWriteUser]
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        print(f"DEBUG: Akte {instance.id} retrieve. Dokumente count: {len(data.get('dokumente', []))}")
+        return Response(data)
+
     def perform_create(self, serializer):
         if self._has_conflict(serializer.validated_data):
             mandant = serializer.validated_data.get("mandant")
@@ -83,6 +90,40 @@ class AkteViewSet(viewsets.ModelViewSet):
         next_aktenzeichen = f"{next_num:04d}.{current_year}.awr"
         
         return Response({"next_aktenzeichen": next_aktenzeichen})
+
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        """
+        Sucht nach Akten basierend auf Aktenzeichen oder Mandant
+        Query-Parameter: q (Suchbegriff)
+        """
+        query = request.query_params.get('q', '').strip()
+        
+        # Mindestens 2 Zeichen für Suche erforderlich
+        if len(query) < 2:
+            return Response([])
+        
+        # Suche über Aktenzeichen und Mandant-Name
+        akten = Akte.objects.select_related("mandant", "gegner").filter(
+            Q(aktenzeichen__icontains=query) |
+            Q(mandant__name__icontains=query) |
+            Q(gegner__name__icontains=query)
+        )[:10]  # Limit auf 10 Ergebnisse
+        
+        # Verwende vereinfachten Serializer für Suchergebnisse
+        results = [
+            {
+                "id": akte.id,
+                "aktenzeichen": akte.aktenzeichen,
+                "mandant": akte.mandant.name if akte.mandant else None,
+                "gegner": akte.gegner.name if akte.gegner else None,
+                "status": akte.status,
+            }
+            for akte in akten
+        ]
+        
+        return Response(results)
+
 
     @action(detail=False, methods=["get"], url_path="priorisierung")
     def priorisierte_akten(self, request):
@@ -217,6 +258,56 @@ class AkteViewSet(viewsets.ModelViewSet):
 
         return Akte.objects.filter(status="Offen", gegner__name=mandant.name).exists()
 
+    @action(detail=True, methods=["get"], url_path="organizer")
+    def organizer(self, request, pk=None):
+        """
+        Liefert eine kombinierte Liste aller Aufgaben, Fristen und Notizen für eine Akte
+        """
+        akte = self.get_object()
+        
+        aufgaben = akte.aufgaben.all()
+        fristen = akte.fristen.all()
+        notizen = akte.notizen.all()
+        
+        results = []
+        
+        for aufgabe in aufgaben:
+            results.append({
+                "id": aufgabe.id,
+                "typ": "Aufgabe",
+                "titel": aufgabe.titel,
+                "beschreibung": aufgabe.beschreibung,
+                "status": aufgabe.get_status_display(),
+                "faellig_am": aufgabe.faellig_am,
+                "erstellt_am": aufgabe.erstellt_am
+            })
+            
+        for frist in fristen:
+            results.append({
+                "id": frist.id,
+                "typ": "Frist",
+                "titel": frist.bezeichnung,
+                "beschreibung": f"Priorität: {frist.get_prioritaet_display()}",
+                "datum": frist.frist_datum,
+                "status": "Erledigt" if frist.erledigt else "Offen",
+                "prioritaet": frist.prioritaet,
+                "erstellt_am": frist.erstellt_am
+            })
+            
+        for notiz in notizen:
+            results.append({
+                "id": notiz.id,
+                "typ": "Notiz",
+                "titel": notiz.titel,
+                "beschreibung": notiz.inhalt,
+                "erstellt_am": notiz.erstellt_am
+            })
+            
+        # Sortieren nach Erstellungsdatum (neueste zuerst)
+        results.sort(key=lambda x: x["erstellt_am"], reverse=True)
+        
+        return Response(results)
+
 
 class AdressbuchViewSet(ViewSet):
     """
@@ -316,3 +407,23 @@ class DashboardView(APIView):
                 "priorisierte_fristen": fristen_payload,
             }
         )
+
+
+class DokumentViewSet(viewsets.ModelViewSet):
+    queryset = Dokument.objects.all()
+    serializer_class = DokumentSerializer
+    permission_classes = [IsAdminOrReadWriteUser]
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Optional: Delete file from filesystem here if needed
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)

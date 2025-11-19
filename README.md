@@ -1,65 +1,107 @@
-# Kanzlei-Software
+# Kanzlei-Management-System
 
 ## Projektübersicht
 Diese Software ist eine umfassende Lösung für die Verwaltung einer Anwaltskanzlei. Sie digitalisiert und optimiert zentrale Geschäftsprozesse wie die Aktenverwaltung, Finanzübersichten, Sicherheitsmanagement und Terminplanung. Das System ist modular aufgebaut, um Flexibilität und Skalierbarkeit zu gewährleisten.
 
+## Technologie-Stack
+- **Backend**: Django 5.1 + Django REST Framework
+- **Frontend**: React 18 + TypeScript + Vite
+- **Datenbank**: PostgreSQL 16
+- **Deployment**: Docker + Docker Compose
+- **Authentifizierung**: JWT (JSON Web Tokens)
+
 ## Architektur
 Das Backend der Kanzlei-Software basiert auf Django und ist in mehrere Apps unterteilt, die jeweils spezifische Funktionalitäten bereitstellen:
 
-*   [`aktenverwaltung`](backend/aktenverwaltung/): Verwaltet alle relevanten Informationen zu den Mandantenakten.
-*   [`security`](backend/security/): Verantwortlich für Authentifizierung, Autorisierung und Benutzerverwaltung.
-*   [`finanzen`](backend/finanzen/): Behandelt alle finanziellen Aspekte, Rechnungen und Zahlungseingänge.
-*   [`storage`](backend/aktenverwaltung/storage.py): Ermöglicht die sichere Speicherung und den Abruf von Dokumenten und Dateien.
-*   [`organizer`](backend/organizer/): Bietet Funktionen zur Terminplanung und Aufgabenverwaltung.
+*   [`aktenverwaltung`](backend/aktenverwaltung/): Verwaltet alle relevanten Informationen zu den Mandantenakten, inkl. Dokumenten-Management
+*   [`security`](backend/security/): Verantwortlich für Authentifizierung, Autorisierung und Benutzerverwaltung
+*   [`finanzen`](backend/finanzen/): Behandelt alle finanziellen Aspekte, Rechnungen und Zahlungseingänge
+*   [`storage`](backend/aktenverwaltung/storage.py): Ermöglicht die sichere Speicherung und den Abruf von Dokumenten und Dateien
+*   [`organizer`](backend/organizer/): Bietet Funktionen zur Terminplanung, Aufgabenverwaltung und Dashboard
 
-## Implementierte Features (Backend Core)
-*   **JSONB-Datenstruktur:** Flexible und erweiterbare Speicherung von Akteninformationen in einer JSONB-Spalte.
-*   **JWT-Authentifizierung:** Sichere Benutzerauthentifizierung mittels JSON Web Tokens.
-*   **Rollenbasierte Berechtigungen:** Implementierung von Benutzerrollen (Admin, Sachbearbeiter, Mandant) mit entsprechenden Zugriffsrechten.
-*   **Finanz-CRUD:** Vollständige Funktionen zum Erstellen, Lesen, Aktualisieren und Löschen von Finanzdaten.
-*   **Storage-CRUD:** Vollständige Funktionen zum Verwalten von gespeicherten Dokumenten und Dateien.
+## Implementierte Features
+
+### Backend
+*   **JSONB-Datenstruktur:** Flexible und erweiterbare Speicherung von Akteninformationen
+*   **JWT-Authentifizierung:** Sichere Benutzerauthentifizierung mittels JSON Web Tokens
+*   **Rollenbasierte Berechtigungen:** Admin, Sachbearbeiter, Mandant mit entsprechenden Zugriffsrechten
+*   **Finanz-CRUD:** Vollständige Verwaltung von Finanzdaten
+*   **Dokumenten-Management:** Upload, Download, Bearbeitung und Löschung von Dokumenten
+*   **Dashboard-API:** Priorisierte Fristen mit Aktenzeichen und Tage-bis-Frist-Berechnung
+
+### Frontend
+*   **Moderne React-UI:** Responsives Design mit Tailwind CSS
+*   **Dokumenten-Verwaltung:**
+    - Drag & Drop Upload
+    - Inline-Bearbeitung (Titel & Datum)
+    - Direktes Öffnen von PDFs im Browser
+    - Löschen-Funktion mit Bestätigung
+    - Automatische Listen-Aktualisierung
+*   **Dashboard:** Übersicht über offene Aufgaben und Fristen
+*   **Benachrichtigungen:** Echtzeit-Anzeige priorisierter Fristen
+*   **Organizer:** Aufgaben, Fristen und Notizen pro Akte
 
 ## Setup-Anleitung
 
 ### Voraussetzungen
-*   Python 3.11 oder 3.12
-*   `venv` (virtuelle Umgebung)
+*   Docker Desktop (Windows/macOS) oder Docker Engine + Docker Compose (Linux)
+*   Git
 
-### Installation und Start
-1.  **Virtuelle Umgebung erstellen und aktivieren:**
+### Installation und Start mit Docker
+
+1.  **Repository klonen:**
     ```bash
-    python -m venv venv
-    # Unter Windows:
-    .\venv\Scripts\activate
-    # Unter macOS/Linux:
-    source venv/bin/activate
+    git clone <repository-url>
+    cd Kanzlei_V2
     ```
 
-2.  **Abhängigkeiten installieren:**
+2.  **Umgebungsvariablen konfigurieren:**
     ```bash
-    pip install -r backend/requirements.txt
+    # .env Datei im Hauptverzeichnis erstellen (falls nicht vorhanden)
+    # Beispiel-Konfiguration:
+    POSTGRES_DB=kanzlei_db
+    POSTGRES_USER=kanzlei_user
+    POSTGRES_PASSWORD=secure_password
+    DJANGO_SECRET_KEY=your-secret-key-here
+    KANZELEI_DOCS_ROOT=/app/kanzlei_docs
     ```
 
-3.  **Datenbankmigrationen durchführen:**
+3.  **Container starten:**
     ```bash
-    python backend/manage.py migrate
+    docker-compose up -d
     ```
 
-4.  **Testbenutzer erstellen:**
+4.  **Datenbankmigrationen durchführen:**
     ```bash
-    python backend/manage.py create_test_users
+    docker-compose exec backend python manage.py migrate
     ```
 
-5.  **Django-Server starten:**
+5.  **Testbenutzer erstellen:**
     ```bash
-    python backend/manage.py runserver
+    docker-compose exec backend python manage.py create_test_users
     ```
 
-### Tests ausführen
-Um die Tests auszuführen, stellen Sie sicher, dass die virtuelle Umgebung aktiviert ist und führen Sie folgenden Befehl aus:
+6.  **Anwendung öffnen:**
+    - Frontend: http://localhost:3003
+    - Backend API: http://localhost:8000/api/
+
+### Container-Verwaltung
 ```bash
-pytest backend/
+# Container stoppen
+docker-compose stop
+
+# Container neu starten
+docker-compose restart
+
+# Logs anzeigen
+docker-compose logs -f
+
+# Container entfernen
+docker-compose down
 ```
+
+### Entwicklung ohne Docker (Optional)
+Für lokale Entwicklung ohne Docker siehe [DEVELOPMENT.md](DEVELOPMENT.md)
 
 ## Test-Zugangsdaten
 
