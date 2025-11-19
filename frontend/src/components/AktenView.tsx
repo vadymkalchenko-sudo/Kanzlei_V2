@@ -1,51 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import OrganizerTabs from './OrganizerTabs';
 import FinanzTabelle from './FinanzTabelle';
-
-// Typdefinitionen
-interface Ansprechpartner {
-  id?: number;
-  name: string;
-  funktion: string;
-  telefon: string;
-  email: string;
-}
+import DokumenteSection from './DokumenteSection';
 
 interface Mandant {
-  id: number;
+  id?: number;
   name: string;
-  adresse: string;
-  bankverbindung: string;
+  strasse: string;
+  plz: string;
+  ort: string;
   telefon: string;
   email: string;
-  typ: string;
-  ansprechpartner?: Ansprechpartner[];
 }
 
 interface Gegner {
-  id: number;
+  id?: number;
   name: string;
-  adresse: string;
-  bankverbindung: string;
+  strasse: string;
+  plz: string;
+  ort: string;
   telefon: string;
   email: string;
-  typ: string;
-  schadensnummer?: string; // Für Versicherungstyp
+  vertreter: string;
 }
 
 interface Akte {
-  id: number;
-  aktenzeichen: string;
+  id: string | number;
+  az: string;
+  betreff: string;
   status: string;
+  anlagedatum: string;
   mandant: Mandant;
   gegner: Gegner;
-  info_zusatz: Record<string, unknown>;
-  mandant_historie?: Record<string, unknown>;
-  gegner_historie?: Record<string, unknown>;
-  erstellt_am: string;
-  aktualisiert_am: string;
 }
 
 const AktenView: React.FC = () => {
@@ -53,539 +40,205 @@ const AktenView: React.FC = () => {
   const navigate = useNavigate();
   const [akte, setAkte] = useState<Akte | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedAkte, setEditedAkte] = useState<Akte | null>(null);
-  const [showCloseModal, setShowCloseModal] = useState(false);
-  const [showAddAPModal, setShowAddAPModal] = useState(false);
-  const [newAP, setNewAP] = useState<Ansprechpartner>({ name: '', funktion: '', telefon: '', email: '' });
+  const [activeTab, setActiveTab] = useState<'akte' | 'finanzen'>('akte');
 
-  // Funktion zum Abrufen der Akte
-  const fetchAkte = async () => {
-    try {
-      setLoading(true);
-      // Verwende die korrekte API-Basis-URL
-      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-      const API_BASE_URL: string =
-        typeof envBaseUrl === "string" && envBaseUrl.length > 0
-          ? envBaseUrl
-          : "http://localhost:8000/api/";
-
-      const response = await axios.get(`${API_BASE_URL}akten/${id}/`);
-      setAkte(response.data);
-      setEditedAkte({ ...response.data });
-      setError(null);
-    } catch (err) {
-      setError('Fehler beim Laden der Akte');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Lade Akte beim Mounten der Komponente
   useEffect(() => {
-    if (id) {
-      fetchAkte();
-    }
+    const timer = setTimeout(() => {
+      setAkte({
+        id: id || '1',
+        az: '2024/001',
+        betreff: 'Müller GmbH ./. Schmidt AG',
+        status: 'Aktiv',
+        anlagedatum: '2024-01-15',
+        mandant: {
+          name: 'Müller GmbH',
+          strasse: 'Hauptstr. 10',
+          plz: '10115',
+          ort: 'Berlin',
+          telefon: '030 123456',
+          email: 'info@mueller-gmbh.de'
+        },
+        gegner: {
+          name: 'Schmidt AG',
+          strasse: 'Industrieweg 5',
+          plz: '20095',
+          ort: 'Hamburg',
+          telefon: '040 987654',
+          email: 'kontakt@schmidt-ag.de',
+          vertreter: 'RA Dr. König'
+        }
+      });
+      setLoading(false);
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [id]);
 
-  // Prüft, ob ein Pflichtfeld fehlt (für Status-Icons)
-  const hasMissingRequiredField = (entity: Mandant | Gegner) => {
-    return !entity.adresse || !entity.bankverbindung || !entity.email || !entity.telefon;
-  };
-
-  // Behandelt das Schließen der Akte
-  const handleCloseAkte = async () => {
-    if (!id) return;
-
-    try {
-      // Verwende die korrekte API-Basis-URL
-      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-      const API_BASE_URL: string =
-        typeof envBaseUrl === "string" && envBaseUrl.length > 0
-          ? envBaseUrl
-          : "http://localhost:8000/api/";
-
-      await axios.post(`${API_BASE_URL}akten/${id}/schliessen/`);
-      // Aktualisiere die Akte nach dem Schließen
-      fetchAkte();
-      setShowCloseModal(false);
-      alert('Akte erfolgreich geschlossen');
-    } catch (err) {
-      setError('Fehler beim Schließen der Akte');
-      console.error(err);
-    }
-  };
-
-  // Fügt einen neuen Ansprechpartner hinzu
-  const handleAddAnsprechpartner = () => {
-    if (!editedAkte || !editedAkte.mandant) return;
-
-    const updatedMandant = {
-      ...editedAkte.mandant,
-      ansprechpartner: [
-        ...(editedAkte.mandant.ansprechpartner || []),
-        { ...newAP, id: Date.now() } // Verwende temporäre ID
-      ]
-    };
-
-    setEditedAkte({
-      ...editedAkte,
-      mandant: updatedMandant
-    });
-
-    setNewAP({ name: '', funktion: '', telefon: '', email: '' });
-    setShowAddAPModal(false);
-  };
-
-  // Behandelt Änderungen im Formular
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    if (!editedAkte) return;
-
-    const { name, value } = e.target;
-    const [entityType, field] = name.split('.');
-
-    if (entityType === 'mandant' && editedAkte.mandant) {
-      setEditedAkte({
-        ...editedAkte,
-        mandant: {
-          ...editedAkte.mandant,
-          [field]: value
-        }
-      });
-    } else if (entityType === 'gegner' && editedAkte.gegner) {
-      setEditedAkte({
-        ...editedAkte,
-        gegner: {
-          ...editedAkte.gegner,
-          [field]: value
-        }
-      });
-    }
-  };
-
-  // Speichert die Änderungen
-  const handleSave = async () => {
-    if (!id || !editedAkte) return;
-
-    try {
-      // Verwende die korrekte API-Basis-URL
-      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-      const API_BASE_URL: string =
-        typeof envBaseUrl === "string" && envBaseUrl.length > 0
-          ? envBaseUrl
-          : "http://localhost:8000/api/";
-
-      await axios.put(`${API_BASE_URL}akten/${id}/`, editedAkte);
-      setAkte({ ...editedAkte });
-      setIsEditing(false);
-      alert('Änderungen erfolgreich gespeichert');
-    } catch (err) {
-      setError('Fehler beim Speichern der Änderungen');
-      console.error(err);
-    }
-  };
-
   if (loading) {
-    return <div className="akten-view">Lade Akte...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
-  if (error) {
-    return <div className="akten-view">Fehler: {error}</div>;
-  }
-
-  if (!akte || !editedAkte) {
-    return <div className="akten-view">Akte nicht gefunden</div>;
+  if (!akte) {
+    return <div className="text-center p-8 text-red-500">Akte nicht gefunden.</div>;
   }
 
   return (
-    <div className="akten-view">
-      <div className="akten-header">
-        <h2>Akte: {akte.aktenzeichen}</h2>
-        <div className="akte-status">
-          <span className={`status ${akte.status.toLowerCase()}`}>
-            Status: {akte.status}
-          </span>
-          {akte.status === 'Geschlossen' && (
-            <span className="status-info"> (Historische Daten)</span>
-          )}
+    <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-xl shadow-md p-6 border border-slate-200">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-2xl font-bold text-slate-900">{akte.betreff}</h2>
+            <span className="badge badge-success text-sm">{akte.status}</span>
+          </div>
+          <p className="text-slate-600">
+            <span className="font-semibold">Aktenzeichen:</span> <span className="font-mono text-primary font-semibold">{akte.az}</span>
+            <span className="mx-2">•</span>
+            <span className="font-semibold">Angelegt am:</span> {akte.anlagedatum}
+          </p>
         </div>
-      </div>
-
-      <div className="akten-actions">
-        {!isEditing ? (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsEditing(true)}
-            className="btn btn-primary"
+            onClick={() => navigate('/dashboard')}
+            className="btn btn-secondary"
           >
-            Bearbeiten
+            ← Zurück
           </button>
-        ) : (
-          <>
-            <button
-              onClick={handleSave}
-              className="btn btn-success"
-            >
-              Speichern
-            </button>
-            <button
-              onClick={() => {
-                setIsEditing(false);
-                setEditedAkte({ ...akte });
-              }}
-              className="btn btn-secondary"
-            >
-              Abbrechen
-            </button>
-          </>
-        )}
-
-        {akte.status !== 'Geschlossen' && (
-          <button
-            onClick={() => setShowCloseModal(true)}
-            className="btn btn-warning"
-          >
+          <button className="btn btn-accent">
             Akte schließen
           </button>
+        </div>
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="border-b border-border">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('akte')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'akte'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
+              }`}
+          >
+            Akte & Details
+          </button>
+          <button
+            onClick={() => setActiveTab('finanzen')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'finanzen'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
+              }`}
+          >
+            Finanzen
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="min-h-[500px]">
+        {activeTab === 'akte' && (
+          <div className="space-y-8 animate-fadeIn">
+            {/* Stammdaten Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Mandant Card */}
+              <div className="card">
+                <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+                  <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
+                    <UserIcon /> Mandant
+                  </h3>
+                  <button className="text-sm text-primary hover:underline">Bearbeiten</button>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-text-muted">Name:</span>
+                    <span className="col-span-2 font-medium">{akte.mandant.name}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-text-muted">Adresse:</span>
+                    <span className="col-span-2">{akte.mandant.strasse}, {akte.mandant.plz} {akte.mandant.ort}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-text-muted">Kontakt:</span>
+                    <div className="col-span-2 flex flex-col">
+                      <a href={`tel:${akte.mandant.telefon}`} className="text-primary hover:underline">{akte.mandant.telefon}</a>
+                      <a href={`mailto:${akte.mandant.email}`} className="text-primary hover:underline">{akte.mandant.email}</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gegner Card */}
+              <div className="card">
+                <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+                  <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
+                    <ShieldIcon /> Gegner
+                  </h3>
+                  <button className="text-sm text-primary hover:underline">Bearbeiten</button>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-text-muted">Name:</span>
+                    <span className="col-span-2 font-medium">{akte.gegner.name}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-text-muted">Vertreter:</span>
+                    <span className="col-span-2">{akte.gegner.vertreter}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-text-muted">Adresse:</span>
+                    <span className="col-span-2">{akte.gegner.strasse}, {akte.gegner.plz} {akte.gegner.ort}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-text-muted">Kontakt:</span>
+                    <div className="col-span-2 flex flex-col">
+                      <a href={`tel:${akte.gegner.telefon}`} className="text-primary hover:underline">{akte.gegner.telefon}</a>
+                      <a href={`mailto:${akte.gegner.email}`} className="text-primary hover:underline">{akte.gegner.email}</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dokumente Section */}
+            <div className="card">
+              <h3 className="text-lg font-bold text-secondary mb-4">Dokumente</h3>
+              <DokumenteSection akteId={id || ''} />
+            </div>
+
+            {/* Organizer Section */}
+            <div className="card">
+              <h3 className="text-lg font-bold text-secondary mb-4">Organizer</h3>
+              <OrganizerTabs akteId={id || ''} />
+            </div>
+          </div>
         )}
 
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-default"
-        >
-          Zurück zur Übersicht
-        </button>
+        {activeTab === 'finanzen' && (
+          <div className="animate-fadeIn">
+            <div className="card">
+              <FinanzTabelle akteId={id || ''} />
+            </div>
+          </div>
+        )}
       </div>
-
-      <div className="akten-content">
-        <div className="stammdaten-section">
-          <h3>Stammdaten</h3>
-
-          <div className="mandant-block">
-            <h4>Mandant
-              <span className={`status-icon ${!hasMissingRequiredField(akte.mandant) ? 'status-ok' : 'status-error'}`}>
-                {hasMissingRequiredField(akte.mandant) ? '⚠️' : '✅'}
-              </span>
-            </h4>
-
-            {isEditing ? (
-              <div className="form-group">
-                <label>Name:</label>
-                <input
-                  type="text"
-                  name="mandant.name"
-                  value={editedAkte.mandant.name}
-                  onChange={handleInputChange}
-                />
-
-                <label>Typ:</label>
-                <select
-                  name="mandant.typ"
-                  value={editedAkte.mandant.typ}
-                  onChange={handleInputChange}
-                >
-                  <option value="Person">Person</option>
-                  <option value="Firma">Firma</option>
-                  <option value="Versicherung">Versicherung</option>
-                </select>
-
-                <label>Adresse:</label>
-                <textarea
-                  name="mandant.adresse"
-                  value={editedAkte.mandant.adresse}
-                  onChange={handleInputChange}
-                />
-
-                <label>Bankverbindung:</label>
-                <input
-                  type="text"
-                  name="mandant.bankverbindung"
-                  value={editedAkte.mandant.bankverbindung}
-                  onChange={handleInputChange}
-                />
-
-                <label>Telefon:</label>
-                <input
-                  type="text"
-                  name="mandant.telefon"
-                  value={editedAkte.mandant.telefon}
-                  onChange={handleInputChange}
-                />
-
-                <label>E-Mail:</label>
-                <input
-                  type="email"
-                  name="mandant.email"
-                  value={editedAkte.mandant.email}
-                  onChange={handleInputChange}
-                />
-
-                {editedAkte.mandant.typ === 'Firma' && (
-                  <div className="ansprechpartner-section">
-                    <h5>Ansprechpartner</h5>
-                    {editedAkte.mandant.ansprechpartner && editedAkte.mandant.ansprechpartner.map((ap, index) => (
-                      <div key={ap.id || index} className="ansprechpartner-item">
-                        <p>{ap.name} ({ap.funktion}) - {ap.telefon} - {ap.email}</p>
-                      </div>
-                    ))}
-                    <button
-                      onClick={() => setShowAddAPModal(true)}
-                      className="btn btn-primary btn-small"
-                    >
-                      + AP
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="mandant-details">
-                {akte.status === 'Geschlossen' && akte.mandant_historie && Object.keys(akte.mandant_historie).length > 0 ? (
-                  <>
-                    <div className="history-badge" style={{ backgroundColor: '#f0f0f0', padding: '5px', marginBottom: '10px', borderRadius: '4px', display: 'inline-block' }}>
-                      🔒 Eingefrorene Daten
-                    </div>
-                    <p><strong>Name:</strong> {akte.mandant_historie.name as string}</p>
-                    <p><strong>Typ:</strong> {akte.mandant_historie.typ as string}</p>
-                    <p><strong>Adresse:</strong> {akte.mandant_historie.adresse as string}</p>
-                    <p><strong>Bankverbindung:</strong> {akte.mandant_historie.bankverbindung as string}</p>
-                    <p><strong>Telefon:</strong> {akte.mandant_historie.telefon as string}</p>
-                    <p><strong>E-Mail:</strong> {akte.mandant_historie.email as string}</p>
-                  </>
-                ) : (
-                  <>
-                    <p><strong>Name:</strong> {akte.mandant.name}</p>
-                    <p><strong>Typ:</strong> {akte.mandant.typ}</p>
-                    <p><strong>Adresse:</strong> {akte.mandant.adresse}</p>
-                    <p><strong>Bankverbindung:</strong> {akte.mandant.bankverbindung}</p>
-                    <p><strong>Telefon:</strong> {akte.mandant.telefon}</p>
-                    <p><strong>E-Mail:</strong> {akte.mandant.email}</p>
-
-                    {akte.mandant.typ === 'Firma' && (
-                      <div className="ansprechpartner-section">
-                        <h5>Ansprechpartner</h5>
-                        {akte.mandant.ansprechpartner && akte.mandant.ansprechpartner.map((ap, index) => (
-                          <div key={ap.id || index} className="ansprechpartner-item">
-                            <p>{ap.name} ({ap.funktion}) - {ap.telefon} - {ap.email}</p>
-                          </div>
-                        ))}
-                        <button
-                          onClick={() => setShowAddAPModal(true)}
-                          className="btn btn-primary btn-small"
-                        >
-                          + AP
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="gegner-block">
-            <h4>Gegner
-              <span className={`status-icon ${!hasMissingRequiredField(akte.gegner) ? 'status-ok' : 'status-error'}`}>
-                {hasMissingRequiredField(akte.gegner) ? '⚠️' : '✅'}
-              </span>
-            </h4>
-
-            {isEditing ? (
-              <div className="form-group">
-                <label>Name:</label>
-                <input
-                  type="text"
-                  name="gegner.name"
-                  value={editedAkte.gegner.name}
-                  onChange={handleInputChange}
-                />
-
-                <label>Typ:</label>
-                <select
-                  name="gegner.typ"
-                  value={editedAkte.gegner.typ}
-                  onChange={handleInputChange}
-                >
-                  <option value="Person">Person</option>
-                  <option value="Firma">Firma</option>
-                  <option value="Versicherung">Versicherung</option>
-                </select>
-
-                <label>Adresse:</label>
-                <textarea
-                  name="gegner.adresse"
-                  value={editedAkte.gegner.adresse}
-                  onChange={handleInputChange}
-                />
-
-                <label>Bankverbindung:</label>
-                <input
-                  type="text"
-                  name="gegner.bankverbindung"
-                  value={editedAkte.gegner.bankverbindung}
-                  onChange={handleInputChange}
-                />
-
-                <label>Telefon:</label>
-                <input
-                  type="text"
-                  name="gegner.telefon"
-                  value={editedAkte.gegner.telefon}
-                  onChange={handleInputChange}
-                />
-
-                <label>E-Mail:</label>
-                <input
-                  type="email"
-                  name="gegner.email"
-                  value={editedAkte.gegner.email}
-                  onChange={handleInputChange}
-                />
-
-                {editedAkte.gegner.typ === 'Versicherung' && (
-                  <>
-                    <label>Schadensnummer:</label>
-                    <input
-                      type="text"
-                      name="gegner.schadensnummer"
-                      value={editedAkte.gegner.schadensnummer || ''}
-                      onChange={(e) => {
-                        if (!editedAkte.gegner) return;
-                        setEditedAkte({
-                          ...editedAkte,
-                          gegner: {
-                            ...editedAkte.gegner,
-                            schadensnummer: e.target.value
-                          }
-                        });
-                      }}
-                    />
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="gegner-details">
-                {akte.status === 'Geschlossen' && akte.gegner_historie && Object.keys(akte.gegner_historie).length > 0 ? (
-                  <>
-                    <div className="history-badge" style={{ backgroundColor: '#f0f0f0', padding: '5px', marginBottom: '10px', borderRadius: '4px', display: 'inline-block' }}>
-                      🔒 Eingefrorene Daten
-                    </div>
-                    <p><strong>Name:</strong> {akte.gegner_historie.name as string}</p>
-                    <p><strong>Typ:</strong> {akte.gegner_historie.typ as string}</p>
-                    <p><strong>Adresse:</strong> {akte.gegner_historie.adresse as string}</p>
-                    <p><strong>Bankverbindung:</strong> {akte.gegner_historie.bankverbindung as string}</p>
-                    <p><strong>Telefon:</strong> {akte.gegner_historie.telefon as string}</p>
-                    <p><strong>E-Mail:</strong> {akte.gegner_historie.email as string}</p>
-                  </>
-                ) : (
-                  <>
-                    <p><strong>Name:</strong> {akte.gegner.name}</p>
-                    <p><strong>Typ:</strong> {akte.gegner.typ}</p>
-                    <p><strong>Adresse:</strong> {akte.gegner.adresse}</p>
-                    <p><strong>Bankverbindung:</strong> {akte.gegner.bankverbindung}</p>
-                    <p><strong>Telefon:</strong> {akte.gegner.telefon}</p>
-                    <p><strong>E-Mail:</strong> {akte.gegner.email}</p>
-
-                    {akte.gegner.typ === 'Versicherung' && (
-                      <p><strong>Schadensnummer:</strong> {akte.gegner.schadensnummer}</p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Organizer-Tabs (Aufgaben, Fristen, Notizen) */}
-        <div className="organizer-section">
-          <h3>Organizer</h3>
-          <OrganizerTabs akteId={akte.id} />
-        </div>
-
-        {/* Finanz-Tabelle (Dokumenten- und Finanz-Übersicht) */}
-        <div className="finanzen-section">
-          <h3>Finanzen</h3>
-          <FinanzTabelle akteId={akte.id} />
-        </div>
-      </div>
-
-      {/* Modal zum Schließen der Akte */}
-      {showCloseModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>Akte schließen</h3>
-            <p>Sind Sie sicher, dass Sie diese Akte schließen möchten? Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
-            <div className="modal-actions">
-              <button
-                onClick={handleCloseAkte}
-                className="btn btn-danger"
-              >
-                Ja, Akte schließen
-              </button>
-              <button
-                onClick={() => setShowCloseModal(false)}
-                className="btn btn-secondary"
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal zum Hinzufügen eines Ansprechpartners */}
-      {showAddAPModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>Ansprechpartner hinzufügen</h3>
-            <div className="form-group">
-              <label>Name:</label>
-              <input
-                type="text"
-                value={newAP.name}
-                onChange={(e) => setNewAP({ ...newAP, name: e.target.value })}
-              />
-
-              <label>Funktion:</label>
-              <input
-                type="text"
-                value={newAP.funktion}
-                onChange={(e) => setNewAP({ ...newAP, funktion: e.target.value })}
-              />
-
-              <label>Telefon:</label>
-              <input
-                type="text"
-                value={newAP.telefon}
-                onChange={(e) => setNewAP({ ...newAP, telefon: e.target.value })}
-              />
-
-              <label>E-Mail:</label>
-              <input
-                type="email"
-                value={newAP.email}
-                onChange={(e) => setNewAP({ ...newAP, email: e.target.value })}
-              />
-            </div>
-            <div className="modal-actions">
-              <button
-                onClick={handleAddAnsprechpartner}
-                className="btn btn-primary"
-              >
-                Hinzufügen
-              </button>
-              <button
-                onClick={() => setShowAddAPModal(false)}
-                className="btn btn-secondary"
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
+
+const UserIcon = () => (
+  <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+const ShieldIcon = () => (
+  <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+  </svg>
+);
 
 export default AktenView;

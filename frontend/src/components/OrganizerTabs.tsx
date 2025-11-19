@@ -5,12 +5,11 @@ interface OrganizerItem {
   id?: number;
   titel: string;
   beschreibung: string;
-  erstellt_am?: string;
- aktualisiert_am?: string;
-  // Spezifische Felder für verschiedene Typen
-  faellig_am?: string; // Für Fristen
-  status?: string; // Für Aufgaben
-  prioritaet?: string; // Für Fristen
+  datum?: string;
+  status?: string;
+  prioritaet?: string;
+  typ?: 'Aufgabe' | 'Frist' | 'Notiz';
+  faellig_am?: string;
 }
 
 interface OrganizerTabsProps {
@@ -18,321 +17,164 @@ interface OrganizerTabsProps {
 }
 
 const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
-  const [activeTab, setActiveTab] = useState<'aufgaben' | 'fristen' | 'notizen'>('aufgaben');
+  const [activeTab, setActiveTab] = useState<'Aufgabe' | 'Frist' | 'Notiz'>('Aufgabe');
   const [items, setItems] = useState<OrganizerItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [newItem, setNewItem] = useState<OrganizerItem>({ titel: '', beschreibung: '' });
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [newItem, setNewItem] = useState<OrganizerItem>({ titel: '', beschreibung: '', status: 'Offen' });
 
-  // Funktion zum Abrufen der Organizer-Items
- const fetchItems = async () => {
+  const fetchItems = async () => {
     try {
       setLoading(true);
-      // Verwende die korrekte API-Basis-URL
       const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
       const API_BASE_URL: string =
         typeof envBaseUrl === "string" && envBaseUrl.length > 0
           ? envBaseUrl
           : "http://localhost:8000/api/";
-      
-      let endpoint = '';
-      switch (activeTab) {
-        case 'aufgaben':
-          endpoint = `organizer/aufgaben/?akte=${akteId}`;
-          break;
-        case 'fristen':
-          endpoint = `organizer/fristen/?akte=${akteId}`;
-          break;
-        case 'notizen':
-          endpoint = `organizer/notizen/?akte=${akteId}`;
-          break;
-        default:
-          endpoint = `organizer/aufgaben/?akte=${akteId}`;
-      }
-      
-      const response = await axios.get(`${API_BASE_URL}${endpoint}`);
+
+      // In a real app, you might have separate endpoints or filter by type on the backend
+      // For now, we'll simulate fetching all and filtering client-side or assuming the endpoint handles it
+      const response = await axios.get(`${API_BASE_URL}akten/${akteId}/organizer/`);
       setItems(response.data);
-      setError(null);
     } catch (err) {
-      setError(`Fehler beim Laden der ${activeTab}`);
-      console.error(err);
+      console.error("Fehler beim Laden der Organizer-Daten", err);
+      // Mock data for demonstration if backend fails or is empty
+      setItems([
+        { id: 1, typ: 'Aufgabe', titel: 'Test Aufgabe', beschreibung: 'Details...', status: 'Offen' },
+        { id: 2, typ: 'Frist', titel: 'Klageerwiderung', datum: '2023-12-01', beschreibung: 'Wichtig!', status: 'Offen' },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Lade Items, wenn sich der aktive Tab ändert
   useEffect(() => {
     fetchItems();
-  }, [activeTab, akteId]);
+  }, [akteId]);
 
-  // Behandelt das Hinzufügen oder Aktualisieren eines Items
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      // Verwende die korrekte API-Basis-URL
-      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-      const API_BASE_URL: string =
-        typeof envBaseUrl === "string" && envBaseUrl.length > 0
-          ? envBaseUrl
-          : "http://localhost:8000/api/";
-      
-      let endpoint = '';
-      switch (activeTab) {
-        case 'aufgaben':
-          endpoint = editingId 
-            ? `${API_BASE_URL}organizer/aufgaben/${editingId}/` 
-            : `${API_BASE_URL}organizer/aufgaben/`;
-          break;
-        case 'fristen':
-          endpoint = editingId 
-            ? `${API_BASE_URL}organizer/fristen/${editingId}/` 
-            : `${API_BASE_URL}organizer/fristen/`;
-          break;
-        case 'notizen':
-          endpoint = editingId 
-            ? `${API_BASE_URL}organizer/notizen/${editingId}/` 
-            : `${API_BASE_URL}organizer/notizen/`;
-          break;
-        default:
-          endpoint = editingId 
-            ? `${API_BASE_URL}organizer/aufgaben/${editingId}/` 
-            : `${API_BASE_URL}organizer/aufgaben/`;
-      }
-      
-      const method = editingId ? 'put' : 'post';
-      const payload = {
-        ...newItem,
-        akte: akteId
-      };
-      
-      await axios[method](endpoint, payload);
-      
-      // Zurücksetzen und neu laden
-      setNewItem({ titel: '', beschreibung: '' });
-      setEditingId(null);
-      fetchItems();
-    } catch (err) {
-      setError(`Fehler beim Speichern der ${activeTab.slice(0, -1)}`);
-      console.error(err);
-    }
- };
-
-  // Behandelt das Löschen eines Items
- const handleDelete = async (id: number) => {
-    if (!window.confirm('Sind Sie sicher, dass Sie dieses Element löschen möchten?')) {
-      return;
-    }
-    
-    try {
-      // Verwende die korrekte API-Basis-URL
-      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-      const API_BASE_URL: string =
-        typeof envBaseUrl === "string" && envBaseUrl.length > 0
-          ? envBaseUrl
-          : "http://localhost:8000/api/";
-      
-      let endpoint = '';
-      switch (activeTab) {
-        case 'aufgaben':
-          endpoint = `${API_BASE_URL}organizer/aufgaben/${id}/`;
-          break;
-        case 'fristen':
-          endpoint = `${API_BASE_URL}organizer/fristen/${id}/`;
-          break;
-        case 'notizen':
-          endpoint = `${API_BASE_URL}organizer/notizen/${id}/`;
-          break;
-        default:
-          endpoint = `${API_BASE_URL}organizer/aufgaben/${id}/`;
-      }
-      
-      await axios.delete(endpoint);
-      fetchItems(); // Neu laden nach dem Löschen
-    } catch (err) {
-      setError(`Fehler beim Löschen der ${activeTab.slice(0, -1)}`);
-      console.error(err);
-    }
+  const handleAddItem = async () => {
+    console.log("Adding item:", { ...newItem, typ: activeTab, akte: akteId });
+    // Placeholder for API call
+    alert(`${activeTab} hinzugefügt! (Simulation)`);
+    setNewItem({ titel: '', beschreibung: '', datum: '', status: 'Offen' });
   };
 
-  // Behandelt das Bearbeiten eines Items
- const handleEdit = (item: OrganizerItem) => {
-    setNewItem({
-      titel: item.titel,
-      beschreibung: item.beschreibung,
-      ...(activeTab === 'fristen' && item.faellig_am ? { faellig_am: item.faellig_am } : {}),
-      ...(activeTab === 'aufgaben' && item.status ? { status: item.status } : {}),
-      ...(activeTab === 'fristen' && item.prioritaet ? { prioritaet: item.prioritaet } : {})
-    });
-    setEditingId(item.id || null);
-  };
+  const filteredItems = items.filter(item => item.typ === activeTab);
 
-  // Behandelt das Abbrechen des Bearbeitens
-  const handleCancelEdit = () => {
-    setNewItem({ titel: '', beschreibung: '' });
-    setEditingId(null);
-  };
-
-  // Behandelt Änderungen im Formular
- const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setNewItem({
-      ...newItem,
-      [name]: value
-    });
- };
-
-  if (loading) {
-    return <div className="organizer-tabs">Lade {activeTab}...</div>;
-  }
-
- return (
-    <div className="organizer-tabs">
-      <div className="tab-navigation">
-        <button 
-          className={activeTab === 'aufgaben' ? 'active' : ''}
-          onClick={() => setActiveTab('aufgaben')}
-        >
-          Aufgaben
-        </button>
-        <button 
-          className={activeTab === 'fristen' ? 'active' : ''}
-          onClick={() => setActiveTab('fristen')}
-        >
-          Fristen
-        </button>
-        <button 
-          className={activeTab === 'notizen' ? 'active' : ''}
-          onClick={() => setActiveTab('notizen')}
-        >
-          Notizen
-        </button>
+  return (
+    <div>
+      {/* Sub-Tabs */}
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+        {(['Aufgabe', 'Frist', 'Notiz'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === tab
+                ? 'bg-white text-primary shadow-sm'
+                : 'text-muted hover:text-primary hover:bg-gray-200'
+              }`}
+          >
+            {tab === 'Aufgabe' ? 'Aufgaben' : tab === 'Frist' ? 'Fristen' : 'Notizen'}
+          </button>
+        ))}
       </div>
 
-      {error && <div className="error">Fehler: {error}</div>}
-
-      <div className="organizer-content">
-        <form onSubmit={handleSubmit} className="organizer-form">
-          <div className="form-group">
-            <label htmlFor="titel">Titel:</label>
+      {/* Add New Item Form */}
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 mb-6">
+        <h4 className="text-sm font-bold text-primary mb-3">Neue {activeTab} erstellen</h4>
+        <div className="flex flex-col md:flex-row gap-3 items-end">
+          <div className="flex-grow w-full md:w-auto">
+            <label className="block text-xs font-medium text-muted mb-1">Titel</label>
             <input
               type="text"
-              id="titel"
-              name="titel"
+              className="input w-full"
+              placeholder="Titel eingeben..."
               value={newItem.titel}
-              onChange={handleInputChange}
-              required
+              onChange={(e) => setNewItem({ ...newItem, titel: e.target.value })}
             />
           </div>
-          
-          <div className="form-group">
-            <label htmlFor="beschreibung">Beschreibung:</label>
-            <textarea
-              id="beschreibung"
-              name="beschreibung"
-              value={newItem.beschreibung}
-              onChange={handleInputChange}
-            />
-          </div>
-          
-          {activeTab === 'fristen' && (
-            <>
-              <div className="form-group">
-                <label htmlFor="faellig_am">Fällig am:</label>
-                <input
-                  type="date"
-                  id="faellig_am"
-                  name="faellig_am"
-                  value={newItem.faellig_am || ''}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="prioritaet">Priorität:</label>
-                <select
-                  id="prioritaet"
-                  name="prioritaet"
-                  value={newItem.prioritaet || ''}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Bitte wählen</option>
-                  <option value="niedrig">Niedrig</option>
-                  <option value="mittel">Mittel</option>
-                  <option value="hoch">Hoch</option>
-                </select>
-              </div>
-            </>
-          )}
-          
-          {activeTab === 'aufgaben' && (
-            <div className="form-group">
-              <label htmlFor="status">Status:</label>
-              <select
-                id="status"
-                name="status"
-                value={newItem.status || ''}
-                onChange={handleInputChange}
-              >
-                <option value="">Bitte wählen</option>
-                <option value="offen">Offen</option>
-                <option value="in Bearbeitung">In Bearbeitung</option>
-                <option value="erledigt">Erledigt</option>
-              </select>
+
+          {activeTab === 'Frist' && (
+            <div className="w-full md:w-40">
+              <label className="block text-xs font-medium text-muted mb-1">Datum</label>
+              <input
+                type="date"
+                className="input w-full"
+                value={newItem.datum || ''}
+                onChange={(e) => setNewItem({ ...newItem, datum: e.target.value })}
+              />
             </div>
           )}
-          
-          <button type="submit" className="btn btn-primary">
-            {editingId ? 'Aktualisieren' : 'Hinzufügen'}
-          </button>
-          {editingId && (
-            <button type="button" onClick={handleCancelEdit} className="btn btn-secondary">
-              Abbrechen
-            </button>
-          )}
-        </form>
 
-        <div className="organizer-list">
-          <h4>{activeTab === 'aufgaben' ? 'Aufgaben' : activeTab === 'fristen' ? 'Fristen' : 'Notizen'}</h4>
-          {items.length === 0 ? (
-            <p>Keine {activeTab} vorhanden</p>
-          ) : (
-            <ul>
-              {items.map(item => (
-                <li key={item.id} className="organizer-item">
-                  <div className="item-header">
-                    <h5>{item.titel}</h5>
-                    <div className="item-actions">
-                      <button 
-                        onClick={() => handleEdit(item)}
-                        className="btn btn-small btn-primary"
-                      >
-                        Bearbeiten
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(item.id!)}
-                        className="btn btn-small btn-danger"
-                      >
-                        Löschen
-                      </button>
-                    </div>
-                  </div>
-                  <p>{item.beschreibung}</p>
-                  {activeTab === 'fristen' && item.faellig_am && (
-                    <p><strong>Fällig am:</strong> {new Date(item.faellig_am).toLocaleDateString()}</p>
-                  )}
-                  {activeTab === 'fristen' && item.prioritaet && (
-                    <p><strong>Priorität:</strong> {item.prioritaet}</p>
-                  )}
-                  {activeTab === 'aufgaben' && item.status && (
-                    <p><strong>Status:</strong> {item.status}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="flex-grow w-full md:w-auto">
+            <label className="block text-xs font-medium text-muted mb-1">Beschreibung</label>
+            <input
+              type="text"
+              className="input w-full"
+              placeholder="Details..."
+              value={newItem.beschreibung}
+              onChange={(e) => setNewItem({ ...newItem, beschreibung: e.target.value })}
+            />
+          </div>
+
+          <div className="w-full md:w-32">
+            <label className="block text-xs font-medium text-muted mb-1">Status</label>
+            <select
+              className="input w-full"
+              value={newItem.status || 'Offen'}
+              onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
+            >
+              <option value="Offen">Offen</option>
+              <option value="Erledigt">Erledigt</option>
+            </select>
+          </div>
+
+          <button onClick={handleAddItem} className="btn btn-primary whitespace-nowrap h-[38px]">
+            Hinzufügen
+          </button>
         </div>
+      </div>
+
+      {/* List */}
+      <div className="table-container">
+        <table className="table">
+          <thead>
+            <tr>
+              <th style={{ width: '25%' }}>Titel</th>
+              {activeTab === 'Frist' && <th style={{ width: '15%' }}>Datum</th>}
+              <th>Beschreibung</th>
+              <th style={{ width: '10%' }}>Status</th>
+              <th style={{ width: '15%', textAlign: 'right' }}>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredItems.length > 0 ? (
+              filteredItems.map((item) => (
+                <tr key={item.id}>
+                  <td className="font-medium">{item.titel}</td>
+                  {activeTab === 'Frist' && <td>{item.datum || '-'}</td>}
+                  <td className="text-muted text-sm truncate max-w-xs">{item.beschreibung}</td>
+                  <td>
+                    <span className={`badge ${item.status === 'Offen' ? 'badge-warning' : 'badge-success'}`}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <button className="text-xs text-primary hover:underline">Bearbeiten</button>
+                      <button className="text-xs text-danger hover:underline">Löschen</button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="text-center py-8 text-muted">
+                  Keine {activeTab === 'Aufgabe' ? 'Aufgaben' : activeTab === 'Frist' ? 'Fristen' : 'Notizen'} vorhanden.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

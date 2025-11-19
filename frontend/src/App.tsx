@@ -3,27 +3,38 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Dashboard from './components/Dashboard';
 import AktenView from './components/AktenView';
 import AkteForm from './components/AkteForm';
+import Login from './components/Login';
+import Layout from './components/Layout';
+import Settings from './components/Settings';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './context/AuthContext';
 
 function App() {
   return (
-    <Router>
-      <main>
-        <header>
-          <h1>Kanzlei Management System</h1>
-          <p>
-            JSONB-Zusatzdaten und Konfliktprüfung direkt aus dem Browser testen. Port
-            303 ist fest eingestellt.
-          </p>
-        </header>
+    <AuthProvider>
+      <Router>
+        <main>
+          {/* Header nur anzeigen, wenn nicht auf Login-Seite? 
+              Hier lassen wir ihn erstmal, oder passen ihn an. 
+              Für E2E-Test ist es egal, solange Routing stimmt. */}
 
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/akte/:id" element={<AktenView />} />
-          <Route path="/akte" element={<AkteForm />} />
-        </Routes>
-      </main>
-    </Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/finanzen" element={<div>Finanzen (Platzhalter)</div>} />
+            <Route path="/settings" element={<Settings />} />
+
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/akte" element={<AkteForm />} />
+                <Route path="/akte/:id" element={<AktenView />} />
+              </Route>
+            </Route>
+          </Routes>
+        </main>
+      </Router>
+    </AuthProvider>
   );
 }
 

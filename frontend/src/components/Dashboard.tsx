@@ -1,200 +1,141 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React from 'react';
+import { Link } from 'react-router-dom';
 
-// Typdefinitionen
-interface Mandant {
-  id: number;
-  name: string;
-  adresse: string;
-  bankverbindung: string;
-  telefon: string;
-  email: string;
-  typ: string;
-}
+const Dashboard = () => {
+  const stats = [
+    { label: 'Offene Akten', value: '24', change: '+2', trend: 'up', icon: <FolderIcon />, color: 'bg-sky-500' },
+    { label: 'Fristen heute', value: '3', change: '-1', trend: 'down', icon: <ClockIcon />, color: 'bg-amber-500' },
+    { label: 'Termine diese Woche', value: '8', change: '+4', trend: 'up', icon: <CalendarIcon />, color: 'bg-emerald-500' },
+    { label: 'Statistiken', value: '156', change: '+12', trend: 'up', icon: <ChartIcon />, color: 'bg-violet-500' },
+  ];
 
-interface Gegner {
-  id: number;
-  name: string;
-  adresse: string;
-  bankverbindung: string;
-  telefon: string;
-  email: string;
-  typ: string;
-}
-
-interface Akte {
-  id: number;
-  aktenzeichen: string;
-  status: string;
-  mandant: Mandant;
-  gegner: Gegner;
-  erstellt_am: string;
-  aktualisiert_am: string;
-}
-
-const Dashboard: React.FC = () => {
-  const [akten, setAkten] = useState<Akte[]>([]);
-  const [filteredAkten, setFilteredAkten] = useState<Akte[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
-
-  // Funktion zum Abrufen der Akten
-  const fetchAkten = async () => {
-    try {
-      setLoading(true);
-      // Verwende die korrekte API-Basis-URL
-      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-      const API_BASE_URL: string =
-        typeof envBaseUrl === "string" && envBaseUrl.length > 0
-          ? envBaseUrl
-          : "http://localhost:8000/api/";
-      
-      const response = await axios.get(`${API_BASE_URL}akten/`);
-      // Sortiere nach Erstellungsdatum (neueste zuerst)
-      const sortedAkten = response.data.sort((a: Akte, b: Akte) => 
-        new Date(b.erstellt_am).getTime() - new Date(a.erstellt_am).getTime()
-      );
-      setAkten(sortedAkten);
-      setFilteredAkten(sortedAkten);
-      setError(null);
-    } catch (err) {
-      setError('Fehler beim Laden der Akten');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Lade Akten beim Mounten der Komponente
-  useEffect(() => {
-    fetchAkten();
-  }, []);
-
-  // Filtere Akten basierend auf Suchbegriff
-  useEffect(() => {
-    if (!searchTerm) {
-      setFilteredAkten(akten);
-    } else {
-      const term = searchTerm.toLowerCase();
-      const filtered = akten.filter(akte => 
-        akte.aktenzeichen.toLowerCase().includes(term) ||
-        akte.mandant.name.toLowerCase().includes(term) ||
-        akte.gegner.name.toLowerCase().includes(term) ||
-        akte.status.toLowerCase().includes(term)
-      );
-      setFilteredAkten(filtered);
-    }
-  }, [searchTerm, akten]);
-
-  // Behandelt den Doppelklick auf eine Akte
-  const handleAkteDoubleClick = (akteId: number) => {
-    navigate(`/akte/${akteId}`);
-  };
-
-  // Behandelt den Klick auf den Bearbeiten-Button
-  const handleEditClick = (akteId: number) => {
-    navigate(`/akte/${akteId}`);
-  };
-
-  // Löscht eine Akte nach Bestätigung
-  const handleDeleteClick = async (akteId: number, aktenzeichen: string) => {
-    if (window.confirm(`Sind Sie sicher, dass Sie die Akte ${aktenzeichen} löschen möchten?`)) {
-      try {
-        // Verwende die korrekte API-Basis-URL
-        const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-        const API_BASE_URL: string =
-          typeof envBaseUrl === "string" && envBaseUrl.length > 0
-            ? envBaseUrl
-            : "http://localhost:8000/api/";
-            
-        await axios.delete(`${API_BASE_URL}akten/${akteId}/`);
-        // Entferne die gelöschte Akte aus der Liste
-        setAkten(prev => prev.filter(akte => akte.id !== akteId));
-        setFilteredAkten(prev => prev.filter(akte => akte.id !== akteId));
-      } catch (err) {
-        setError('Fehler beim Löschen der Akte');
-        console.error(err);
-      }
-    }
-  };
-
-  if (loading) {
-    return <div className="dashboard">Lade Akten...</div>;
-  }
-
-  if (error) {
-    return <div className="dashboard">Fehler: {error}</div>;
-  }
+  const recentAkten = [
+    { id: 1, az: '2024/001', mandant: 'Müller GmbH', gegner: 'Schmidt AG', status: 'Aktiv', update: 'Heute, 10:30' },
+    { id: 2, az: '2024/002', mandant: 'Dr. Weber', gegner: 'Allianz Vers.', status: 'Warten', update: 'Gestern, 14:15' },
+    { id: 3, az: '2024/003', mandant: 'Klaus Klein', gegner: 'Stadt München', status: 'Aktiv', update: '17.11.2024' },
+    { id: 4, az: '2024/004', mandant: 'ImmoInvest', gegner: 'Bauunternehmung', status: 'Abgeschlossen', update: '15.11.2024' },
+    { id: 5, az: '2024/005', mandant: 'Herbert Meyer', gegner: 'Deutsche Bank', status: 'Aktiv', update: '14.11.2024' },
+  ];
 
   return (
-    <div className="dashboard">
-      <div className="dashboard-header">
-        <h2>Aktenübersicht</h2>
-        <div className="search-container">
-          <input
-            type="text"
-            placeholder="Akten suchen..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
+    <div className="space-y-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <div key={index} className="bg-white rounded-xl shadow-md p-6 border border-slate-200 hover:shadow-lg transition-shadow">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-600">{stat.label}</p>
+                <h3 className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</h3>
+                <div className={`flex items-center mt-3 text-xs font-semibold ${stat.trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <span>{stat.change}</span>
+                  <span className="ml-1 text-slate-500 font-normal">vs. Vormonat</span>
+                </div>
+              </div>
+              <div className={`${stat.color} p-3 rounded-lg text-white`}>
+                {stat.icon}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex gap-3">
+        <Link to="/akte" className="btn btn-accent">
+          <PlusIcon />
+          Neue Akte anlegen
+        </Link>
+        <button className="btn btn-secondary">
+          <CalendarIcon />
+          Termin erstellen
+        </button>
+      </div>
+
+      {/* Recent Files Table */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-slate-900">Zuletzt bearbeitete Akten</h3>
+          <Link to="/akte" className="text-sm font-semibold text-primary hover:text-primary-dark">
+            Alle anzeigen →
+          </Link>
+        </div>
+
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Aktenzeichen</th>
+                <th>Mandant</th>
+                <th>Gegner</th>
+                <th>Status</th>
+                <th>Letztes Update</th>
+                <th className="text-right">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentAkten.map((akte) => (
+                <tr key={akte.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="font-semibold text-primary">
+                    <Link to={`/akte/${akte.id}`} className="hover:underline">{akte.az}</Link>
+                  </td>
+                  <td className="font-medium">{akte.mandant}</td>
+                  <td className="text-slate-600">{akte.gegner}</td>
+                  <td>
+                    <span className={`badge ${akte.status === 'Aktiv' ? 'badge-success' :
+                      akte.status === 'Warten' ? 'badge-warning' : 'badge-neutral'
+                      }`}>
+                      {akte.status}
+                    </span>
+                  </td>
+                  <td className="text-slate-500 text-sm">{akte.update}</td>
+                  <td className="text-right">
+                    <Link
+                      to={`/akte/${akte.id}`}
+                      className="text-primary hover:text-primary-dark font-semibold text-sm"
+                    >
+                      Bearbeiten
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-      
-      <table className="akten-table">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            <th>Nummer</th>
-            <th>Mandant</th>
-            <th>Gegner</th>
-            <th>Status</th>
-            <th>Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredAkten.map(akte => (
-            <tr 
-              key={akte.id} 
-              onDoubleClick={() => handleAkteDoubleClick(akte.id)}
-              className="akte-row"
-            >
-              <td>{new Date(akte.erstellt_am).toLocaleDateString()}</td>
-              <td>{akte.aktenzeichen}</td>
-              <td>{akte.mandant.name}</td>
-              <td>{akte.gegner.name}</td>
-              <td>
-                <span className={`status ${akte.status.toLowerCase()}`}>
-                  {akte.status}
-                </span>
-              </td>
-              <td>
-                <button 
-                  onClick={() => handleEditClick(akte.id)}
-                  className="btn btn-primary"
-                >
-                  Bearbeiten
-                </button>
-                <button 
-                  onClick={() => handleDeleteClick(akte.id, akte.aktenzeichen)}
-                  className="btn btn-danger"
-                >
-                  Löschen
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      
-      {filteredAkten.length === 0 && (
-        <p>Keine Akten gefunden</p>
-      )}
     </div>
   );
 };
+
+// Icons
+const FolderIcon = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+  </svg>
+);
+
+const ClockIcon = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const ChartIcon = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+);
 
 export default Dashboard;
