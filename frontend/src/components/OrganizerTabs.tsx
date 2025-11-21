@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 
 interface OrganizerItem {
   id?: number;
@@ -23,18 +23,10 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
   const [loading, setLoading] = useState(true);
   const [newItem, setNewItem] = useState<OrganizerItem>({ titel: '', beschreibung: '', status: 'offen' });
 
-  const getApiBaseUrl = () => {
-    const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-    return typeof envBaseUrl === "string" && envBaseUrl.length > 0
-      ? envBaseUrl
-      : "http://localhost:8000/api/";
-  };
-
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const API_BASE_URL = getApiBaseUrl();
-      const response = await axios.get(`${API_BASE_URL}akten/${akteId}/organizer/`);
+      const response = await api.get(`akten/${akteId}/organizer/`);
       setItems(response.data);
     } catch (err) {
       console.error("Fehler beim Laden der Organizer-Daten", err);
@@ -51,7 +43,6 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
 
   const handleAddItem = async () => {
     try {
-      const API_BASE_URL = getApiBaseUrl();
       let endpoint = '';
       let payload: any = {
         akte: akteId,
@@ -77,7 +68,7 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
       }
 
       console.log(`Sending payload to ${endpoint}:`, payload);
-      await axios.post(`${API_BASE_URL}${endpoint}`, payload);
+      await api.post(endpoint, payload);
 
       // Reset form and refresh list
       setNewItem({ titel: '', beschreibung: '', datum: '', status: 'offen' });

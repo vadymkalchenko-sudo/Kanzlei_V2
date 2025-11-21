@@ -15,9 +15,9 @@ from rest_framework.viewsets import ViewSet
 from organizer.models import Aufgabe, Frist
 
 from .db_connector import write_akte_data
-from .models import Akte, Dokument, Mandant, Gegner
+from .models import Akte, Dokument, Mandant, Gegner, Drittbeteiligter
 from .permissions import IsAdminOrReadWriteUser
-from .serializers import AkteDashboardSerializer, AkteSerializer, DokumentSerializer, MandantSerializer, GegnerSerializer
+from .serializers import AkteDashboardSerializer, AkteSerializer, DokumentSerializer, MandantSerializer, GegnerSerializer, DrittbeteiligterSerializer
 from .storage import store_document
 
 logger = logging.getLogger(__name__)
@@ -28,12 +28,64 @@ class MandantViewSet(viewsets.ModelViewSet):
     queryset = Mandant.objects.all()
     serializer_class = MandantSerializer
     permission_classes = [IsAdminOrReadWriteUser]
+    
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        query = request.query_params.get("q", "")
+        if query:
+            mandanten = Mandant.objects.filter(
+                Q(name__icontains=query) | 
+                Q(email__icontains=query) |
+                Q(telefon__icontains=query)
+            )
+        else:
+            mandanten = Mandant.objects.all()
+        serializer = self.get_serializer(mandanten, many=True)
+        return Response(serializer.data)
 
 
 class GegnerViewSet(viewsets.ModelViewSet):
     queryset = Gegner.objects.all()
     serializer_class = GegnerSerializer
     permission_classes = [IsAdminOrReadWriteUser]
+    
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        query = request.query_params.get("q", "")
+        if query:
+            gegner = Gegner.objects.filter(
+                Q(name__icontains=query) | 
+                Q(email__icontains=query) |
+                Q(telefon__icontains=query)
+            )
+        else:
+            gegner = Gegner.objects.all()
+        serializer = self.get_serializer(gegner, many=True)
+        return Response(serializer.data)
+
+
+class DrittbeteiligterViewSet(viewsets.ModelViewSet):
+    queryset = Drittbeteiligter.objects.all()
+    serializer_class = DrittbeteiligterSerializer
+    permission_classes = [IsAdminOrReadWriteUser]
+    
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        query = request.query_params.get("q", "")
+        if query:
+            drittbeteiligte = Drittbeteiligter.objects.filter(
+                Q(name__icontains=query) | 
+                Q(email__icontains=query) |
+                Q(telefon__icontains=query) |
+                Q(rolle__icontains=query)
+            )
+        else:
+            drittbeteiligte = Drittbeteiligter.objects.all()
+        serializer = self.get_serializer(drittbeteiligte, many=True)
+        return Response(serializer.data)
+
+
+
 
 
 class AkteViewSet(viewsets.ModelViewSet):
@@ -252,11 +304,13 @@ class AkteViewSet(viewsets.ModelViewSet):
         return response
 
     def _has_conflict(self, validated_data):
-        mandant = validated_data.get("mandant")
-        if not mandant:
+        mandant_obj = validated_data.get("mandant")
+        if not mandant_obj:
             return False
 
-        return Akte.objects.filter(status="Offen", gegner__name=mandant.name).exists()
+        # mandant_obj is now a Mandant instance, not a dict
+        mandant_name = mandant_obj.name
+        return Akte.objects.filter(status="Offen", gegner__name=mandant_name).exists()
 
     @action(detail=True, methods=["get"], url_path="organizer")
     def organizer(self, request, pk=None):

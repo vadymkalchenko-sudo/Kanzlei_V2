@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 
 interface AuthContextType {
     isAuthenticated: boolean;
@@ -18,28 +18,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (token) {
             localStorage.setItem('token', token);
             setIsAuthenticated(true);
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         } else {
             localStorage.removeItem('token');
             setIsAuthenticated(false);
-            delete axios.defaults.headers.common['Authorization'];
         }
     }, [token]);
 
     useEffect(() => {
-        const interceptor = axios.interceptors.request.use(
-            (config) => {
-                const currentToken = localStorage.getItem('token');
-                if (currentToken && !config.headers.Authorization) {
-                    config.headers.Authorization = `Bearer ${currentToken}`;
+        const responseInterceptor = api.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                if (error.response && error.response.status === 401) {
+                    setToken(null);
                 }
-                return config;
-            },
-            (error) => Promise.reject(error)
+                return Promise.reject(error);
+            }
         );
 
         return () => {
-            axios.interceptors.request.eject(interceptor);
+            api.interceptors.response.eject(responseInterceptor);
         };
     }, []);
 

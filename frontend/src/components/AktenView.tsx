@@ -3,13 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import OrganizerTabs from './OrganizerTabs';
 import FinanzTabelle from './FinanzTabelle';
 import DokumenteSection from './DokumenteSection';
+import { api } from '../services/api';
 
 interface Mandant {
   id?: number;
   name: string;
-  strasse: string;
-  plz: string;
-  ort: string;
+  adresse: string;
   telefon: string;
   email: string;
 }
@@ -17,12 +16,10 @@ interface Mandant {
 interface Gegner {
   id?: number;
   name: string;
-  strasse: string;
-  plz: string;
-  ort: string;
+  adresse: string;
   telefon: string;
   email: string;
-  vertreter: string;
+  vertreter?: string;
 }
 
 interface Akte {
@@ -40,39 +37,66 @@ const AktenView: React.FC = () => {
   const navigate = useNavigate();
   const [akte, setAkte] = useState<Akte | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'akte' | 'finanzen'>('akte');
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setAkte({
-        id: id || '1',
-        az: '2024/001',
-        betreff: 'Müller GmbH ./. Schmidt AG',
-        status: 'Aktiv',
-        anlagedatum: '2024-01-15',
-        mandant: {
-          name: 'Müller GmbH',
-          strasse: 'Hauptstr. 10',
-          plz: '10115',
-          ort: 'Berlin',
-          telefon: '030 123456',
-          email: 'info@mueller-gmbh.de'
-        },
-        gegner: {
-          name: 'Schmidt AG',
-          strasse: 'Industrieweg 5',
-          plz: '20095',
-          ort: 'Hamburg',
-          telefon: '040 987654',
-          email: 'kontakt@schmidt-ag.de',
-          vertreter: 'RA Dr. König'
-        }
-      });
-      setLoading(false);
-    }, 500);
+    const fetchAkte = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        const response = await api.get(`akten/${id}/`);
+        const data = response.data;
 
-    return () => clearTimeout(timer);
+        const mappedAkte: Akte = {
+          id: data.id,
+          az: data.aktenzeichen,
+          betreff: `${data.mandant?.name || 'Unbekannt'} ./. ${data.gegner?.name || 'Unbekannt'}`,
+          status: data.status,
+          anlagedatum: new Date(data.erstellt_am).toLocaleDateString('de-DE'),
+          mandant: {
+            name: data.mandant?.name || '',
+            adresse: data.mandant?.adresse || '',
+            telefon: data.mandant?.telefon || '',
+            email: data.mandant?.email || ''
+          },
+          gegner: {
+            name: data.gegner?.name || '',
+            adresse: data.gegner?.adresse || '',
+            telefon: data.gegner?.telefon || '',
+            email: data.gegner?.email || '',
+            vertreter: '' // Backend doesn't seem to provide this explicitly in the serializer yet
+          }
+        };
+
+        setAkte(mappedAkte);
+        setError(null);
+      } catch (err) {
+        console.error("Fehler beim Laden der Akte:", err);
+        setError("Akte konnte nicht geladen werden.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAkte();
   }, [id]);
+
+  const handleCloseAkte = async () => {
+    setIsClosing(true);
+    try {
+      await api.post(`akten/${id}/schliessen/`);
+      // Reload to update status
+      window.location.reload();
+    } catch (err) {
+      console.error("Fehler beim Schließen der Akte", err);
+      alert("Fehler beim Schließen der Akte.");
+      setIsClosing(false);
+      setShowCloseModal(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -82,12 +106,40 @@ const AktenView: React.FC = () => {
     );
   }
 
-  if (!akte) {
-    return <div className="text-center p-8 text-red-500">Akte nicht gefunden.</div>;
+  if (error || !akte) {
+    return <div className="text-center p-8 text-red-500">{error || "Akte nicht gefunden."}</div>;
   }
 
   return (
     <div className="space-y-6">
+      {/* Close Confirmation Modal */}
+      {showCloseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-slate-900 mb-4">Akte schließen</h3>
+            <p className="text-slate-600 mb-6">
+              Möchten Sie diese Akte wirklich schließen? Alle Daten werden eingefroren und als JSON exportiert.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowCloseModal(false)}
+                className="btn btn-secondary"
+                disabled={isClosing}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleCloseAkte}
+                className="btn btn-accent"
+                disabled={isClosing}
+              >
+                {isClosing ? 'Wird geschlossen...' : 'Schließen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-xl shadow-md p-6 border border-slate-200">
         <div>
@@ -108,7 +160,11 @@ const AktenView: React.FC = () => {
           >
             ← Zurück
           </button>
-          <button className="btn btn-accent">
+          <button
+            onClick={() => setShowCloseModal(true)}
+            className="btn btn-accent"
+            disabled={akte.status.toLowerCase() === 'geschlossen'}
+          >
             Akte schließen
           </button>
         </div>
@@ -159,7 +215,7 @@ const AktenView: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <span className="text-text-muted">Adresse:</span>
-                    <span className="col-span-2">{akte.mandant.strasse}, {akte.mandant.plz} {akte.mandant.ort}</span>
+                    <span className="col-span-2">{akte.mandant.adresse}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <span className="text-text-muted">Kontakt:</span>
@@ -190,7 +246,7 @@ const AktenView: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <span className="text-text-muted">Adresse:</span>
-                    <span className="col-span-2">{akte.gegner.strasse}, {akte.gegner.plz} {akte.gegner.ort}</span>
+                    <span className="col-span-2">{akte.gegner.adresse}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <span className="text-text-muted">Kontakt:</span>

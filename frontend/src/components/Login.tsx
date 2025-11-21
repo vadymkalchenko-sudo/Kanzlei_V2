@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../services/api';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -15,21 +15,26 @@ const Login = () => {
         setError('');
 
         try {
-            const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-            const API_BASE_URL: string =
-                typeof envBaseUrl === "string" && envBaseUrl.length > 0
-                    ? envBaseUrl
-                    : "http://localhost:8000/api/";
-
-            const response = await axios.post(`${API_BASE_URL}token/`, {
+            const response = await api.post('token/', {
                 username,
                 password
             });
+            console.log("Login Success. Token:", response.data.access);
 
             localStorage.setItem('token', response.data.access);
             navigate('/dashboard');
-        } catch (err) {
-            setError('Ungültige Anmeldedaten. Bitte versuchen Sie es erneut.');
+        } catch (err: any) {
+            if (err.response) {
+                if (err.response.status === 429) {
+                    setError('Zu viele Anmeldeversuche. Bitte warten Sie einen Moment.');
+                } else if (err.response.status === 401) {
+                    setError('Ungültige Anmeldedaten. Bitte versuchen Sie es erneut.');
+                } else {
+                    setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
+                }
+            } else {
+                setError('Verbindung zum Server fehlgeschlagen.');
+            }
             setLoading(false);
         }
     };

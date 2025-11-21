@@ -1,32 +1,21 @@
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../services/api';
+import axios from 'axios';
 
 const AkteForm: React.FC = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // State for IDs (what we send to backend)
   const [mandantId, setMandantId] = useState<number | null>(null);
   const [gegnerId, setGegnerId] = useState<number | null>(null);
 
-  // Restore nested structure to prevent crash
+  // State for display data (what we show to user)
+  const [mandantData, setMandantData] = useState<any>(null);
+  const [gegnerData, setGegnerData] = useState<any>(null);
+
   const [formData, setFormData] = useState({
-    mandant: {
-      name: '',
-      adresse: '',
-      telefon: '',
-      email: '',
-      typ: 'Person'
-    },
-    gegner: {
-      name: '',
-      adresse: '',
-      telefon: '',
-      email: '',
-      typ: 'Person'
-    },
     aktenzeichen: '',
     status: 'Offen'
   });
@@ -40,36 +29,27 @@ const AkteForm: React.FC = () => {
       const id = parseInt(selectedMandantId);
       setMandantId(id);
       fetchMandantData(id);
-      // localStorage.removeItem('selectedMandantId'); // Keep it to be safe against StrictMode
+      localStorage.removeItem('selectedMandantId');
     }
 
     if (selectedGegnerId) {
       const id = parseInt(selectedGegnerId);
       setGegnerId(id);
       fetchGegnerData(id);
-      // localStorage.removeItem('selectedGegnerId'); // Keep it to be safe against StrictMode
+      localStorage.removeItem('selectedGegnerId');
     }
   }, []);
 
   const fetchMandantData = async (id: number) => {
     try {
-      const response = await api.get(`mandanten/${id}/`);
-      // setMandantData(response.data); // This is redundant with setFormData but kept for clarity if we need raw data later
+      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
+      const API_BASE_URL: string =
+        typeof envBaseUrl === "string" && envBaseUrl.length > 0
+          ? envBaseUrl
+          : "http://localhost:8000/api/";
 
-      // Pre-fill form data
-      setFormData(prev => {
-        const newData = {
-          ...prev,
-          mandant: {
-            name: response.data.name || '',
-            adresse: response.data.adresse || '',
-            telefon: response.data.telefon || '',
-            email: response.data.email || '',
-            typ: response.data.typ || 'Person'
-          }
-        };
-        return newData;
-      });
+      const response = await axios.get(`${API_BASE_URL}mandanten/${id}/`);
+      setMandantData(response.data);
     } catch (err) {
       console.error('Error fetching Mandant data:', err);
     }
@@ -77,64 +57,25 @@ const AkteForm: React.FC = () => {
 
   const fetchGegnerData = async (id: number) => {
     try {
-      const response = await api.get(`gegner/${id}/`);
-      // setGegnerData(response.data); // This is redundant with setFormData but kept for clarity if we need raw data later
+      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
+      const API_BASE_URL: string =
+        typeof envBaseUrl === "string" && envBaseUrl.length > 0
+          ? envBaseUrl
+          : "http://localhost:8000/api/";
 
-      // Pre-fill form data
-      setFormData(prev => ({
-        ...prev,
-        gegner: {
-          name: response.data.name || '',
-          adresse: response.data.adresse || '',
-          telefon: response.data.telefon || '',
-          email: response.data.email || '',
-          typ: response.data.typ || 'Person'
-        }
-      }));
+      const response = await axios.get(`${API_BASE_URL}gegner/${id}/`);
+      setGegnerData(response.data);
     } catch (err) {
       console.error('Error fetching Gegner data:', err);
     }
   };
 
-
-
-  const handleMandantChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    // If user changes data, we assume it's a new entry or update, so we clear the ID to force creation/check
-    // Ideally we would support updating, but for now we treat it as new to avoid overwriting wrong IDs
-    setMandantId(null);
-    setFormData(prev => ({
-      ...prev,
-      mandant: { ...prev.mandant, [name]: value }
-    }));
-  };
-
   const handleGegnerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setGegnerId(null);
     setFormData(prev => ({
       ...prev,
       gegner: { ...prev.gegner, [name]: value }
     }));
-  };
-
-  const handleCancel = () => {
-    localStorage.removeItem('selectedMandantId');
-    localStorage.removeItem('selectedGegnerId');
-    navigate('/dashboard');
-  };
-
-  const handleReset = () => {
-    localStorage.removeItem('selectedMandantId');
-    localStorage.removeItem('selectedGegnerId');
-    setMandantId(null);
-    setGegnerId(null);
-    setFormData({
-      mandant: { name: '', adresse: '', telefon: '', email: '', typ: 'Person' },
-      gegner: { name: '', adresse: '', telefon: '', email: '', typ: 'Person' },
-      aktenzeichen: '',
-      status: 'Offen'
-    });
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -142,59 +83,19 @@ const AkteForm: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Validate that we have at least a Mandant name
-    if (!formData.mandant.name) {
-      setError('Bitte geben Sie einen Mandanten an.');
-      setLoading(false);
-      return;
-    }
-
     try {
-      // Construct payload
-      // If we have an ID, send it. If not, send the object data (which backend will reject if we only allow IDs!)
-      // WAIT! The backend NOW expects IDs for 'mandant' and 'gegner'.
-      // If we don't have an ID (manual entry), we must CREATE the Mandant/Gegner first?
-      // OR we update the serializer to accept nested objects for creation too?
-
-      // The serializer change I made:
-      // mandant = serializers.PrimaryKeyRelatedField(queryset=Mandant.objects.all(), write_only=True)
-      // This means it ONLY accepts IDs!
-
-      // So if manual entry, we MUST create Mandant/Gegner first via API, get ID, then create Akte.
-      // This is a breaking change for manual entry!
-
-      // I need to handle manual entry here.
-
-      let finalMandantId = mandantId;
-      let finalGegnerId = gegnerId;
-
-      // 1. Handle Mandant
-      if (!finalMandantId) {
-        // Create new Mandant
-        const mandantResponse = await api.post(`mandanten/`, formData.mandant);
-        finalMandantId = mandantResponse.data.id;
-      }
-
-      // 2. Handle Gegner
-      if (!finalGegnerId && formData.gegner.name) {
-        // Create new Gegner
-        const gegnerResponse = await api.post(`gegner/`, formData.gegner);
-        finalGegnerId = gegnerResponse.data.id;
-      }
+      const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
+      const API_BASE_URL: string =
+        typeof envBaseUrl === "string" && envBaseUrl.length > 0
+          ? envBaseUrl
+          : "http://localhost:8000/api/";
 
       const payload = {
-        mandant_id: finalMandantId,
-        gegner_id: finalGegnerId,
-        aktenzeichen: formData.aktenzeichen || `AZ-${Date.now()}`,
-        status: formData.status,
+        ...formData,
+        aktenzeichen: formData.aktenzeichen || `AZ-${Date.now()}`
       };
 
-      await api.post(`akten/`, payload);
-
-      // SUCCESS: Reset Form and LocalStorage
-      localStorage.removeItem('selectedMandantId');
-      localStorage.removeItem('selectedGegnerId');
-
+      await axios.post(`${API_BASE_URL}akten/`, payload);
       navigate('/dashboard');
     } catch (err: any) {
       console.error(err);
@@ -202,10 +103,10 @@ const AkteForm: React.FC = () => {
         if (err.response.data.konflikt) {
           setError(`Konflikt: ${err.response.data.konflikt}`);
         } else {
-          setError(`Fehler: ${JSON.stringify(err.response.data)}`);
+          setError(JSON.stringify(err.response.data));
         }
       } else {
-        setError('Ein unerwarteter Fehler ist aufgetreten.');
+        setError('Fehler beim Anlegen der Akte');
       }
     } finally {
       setLoading(false);
@@ -261,7 +162,7 @@ const AkteForm: React.FC = () => {
                   </label>
                   <select
                     name="typ"
-                    value={formData.mandant?.typ || 'Person'}
+                    value={formData.mandant.typ}
                     onChange={handleMandantChange}
                     className="input"
                     required
@@ -279,7 +180,7 @@ const AkteForm: React.FC = () => {
                   <input
                     type="text"
                     name="name"
-                    value={formData.mandant?.name || ''}
+                    value={formData.mandant.name}
                     onChange={handleMandantChange}
                     className="input"
                     required
@@ -294,7 +195,7 @@ const AkteForm: React.FC = () => {
                   <input
                     type="text"
                     name="adresse"
-                    value={formData.mandant?.adresse || ''}
+                    value={formData.mandant.adresse}
                     onChange={handleMandantChange}
                     className="input"
                     placeholder="Straße, PLZ, Ort"
@@ -309,7 +210,7 @@ const AkteForm: React.FC = () => {
                     <input
                       type="tel"
                       name="telefon"
-                      value={formData.mandant?.telefon || ''}
+                      value={formData.mandant.telefon}
                       onChange={handleMandantChange}
                       className="input"
                       placeholder="+49 123 456789"
@@ -323,7 +224,7 @@ const AkteForm: React.FC = () => {
                     <input
                       type="email"
                       name="email"
-                      value={formData.mandant?.email || ''}
+                      value={formData.mandant.email}
                       onChange={handleMandantChange}
                       className="input"
                       placeholder="email@example.com"
@@ -361,7 +262,7 @@ const AkteForm: React.FC = () => {
                   </label>
                   <select
                     name="typ"
-                    value={formData.gegner?.typ || 'Person'}
+                    value={formData.gegner.typ}
                     onChange={handleGegnerChange}
                     className="input bg-white"
                     required
@@ -379,7 +280,7 @@ const AkteForm: React.FC = () => {
                   <input
                     type="text"
                     name="name"
-                    value={formData.gegner?.name || ''}
+                    value={formData.gegner.name}
                     onChange={handleGegnerChange}
                     className="input bg-white"
                     required
@@ -394,7 +295,7 @@ const AkteForm: React.FC = () => {
                   <input
                     type="text"
                     name="adresse"
-                    value={formData.gegner?.adresse || ''}
+                    value={formData.gegner.adresse}
                     onChange={handleGegnerChange}
                     className="input bg-white"
                     placeholder="Straße, PLZ, Ort"
@@ -409,7 +310,7 @@ const AkteForm: React.FC = () => {
                     <input
                       type="tel"
                       name="telefon"
-                      value={formData.gegner?.telefon || ''}
+                      value={formData.gegner.telefon}
                       onChange={handleGegnerChange}
                       className="input bg-white"
                       placeholder="+49 987 654321"
@@ -423,7 +324,7 @@ const AkteForm: React.FC = () => {
                     <input
                       type="email"
                       name="email"
-                      value={formData.gegner?.email || ''}
+                      value={formData.gegner.email}
                       onChange={handleGegnerChange}
                       className="input bg-white"
                       placeholder="email@gegner.de"

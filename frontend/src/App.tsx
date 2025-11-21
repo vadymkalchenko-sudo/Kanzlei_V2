@@ -6,6 +6,7 @@ import AkteForm from './components/AkteForm';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Settings from './components/Settings';
+import Stammdaten from './components/Stammdaten';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -29,6 +30,7 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/akte" element={<AkteForm />} />
                 <Route path="/akte/:id" element={<AktenView />} />
+                <Route path="/stammdaten" element={<Stammdaten />} />
               </Route>
             </Route>
           </Routes>

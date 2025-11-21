@@ -8,6 +8,7 @@ const Sidebar = () => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
     { path: '/akte', label: 'Akten', icon: <FolderIcon /> },
+    { path: '/stammdaten', label: 'Stammdaten', icon: <UsersIcon /> },
     { path: '/kalender', label: 'Kalender', icon: <CalendarIcon /> },
     { path: '/finanzen', label: 'Finanzen', icon: <EuroIcon /> },
     { path: '/settings', label: 'Einstellungen', icon: <SettingsIcon /> },
@@ -36,8 +37,8 @@ const Sidebar = () => {
             key={item.path}
             to={item.path}
             className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${isActive(item.path)
-                ? 'bg-primary text-white shadow-lg'
-                : 'text-slate-300 hover:bg-sidebar-light hover:text-white'
+              ? 'bg-primary text-white shadow-lg'
+              : 'text-slate-300 hover:bg-sidebar-light hover:text-white'
               }`}
           >
             <span className="flex-shrink-0">{item.icon}</span>
@@ -94,6 +95,12 @@ const CalendarIcon = () => (
 const EuroIcon = () => (
   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 15.536c-1.171 1.952-3.07 1.952-4.242 0-1.172-1.953-1.172-5.119 0-7.072 1.171-1.952 3.07-1.952 4.242 0M8 10.5h4m-4 3h4m9-1.5a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
   </svg>
 );
 

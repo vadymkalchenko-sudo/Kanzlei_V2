@@ -43,6 +43,23 @@ class Gegner(ZeitstempelModell):
         return self.name
 
 
+class Drittbeteiligter(ZeitstempelModell):
+    """Drittbeteiligte Personen/Firmen (z.B. Zeugen, Sachverständige, etc.)"""
+    name = models.CharField(max_length=255)
+    adresse = models.TextField(blank=True)
+    telefon = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    typ = models.CharField(max_length=20, choices=TYP_CHOICES, default="Person")
+    rolle = models.CharField(max_length=100, blank=True, help_text="z.B. Zeuge, Sachverständiger, etc.")
+    notizen = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name_plural = "Drittbeteiligte"
+
+    def __str__(self):
+        return f"{self.name} ({self.rolle})" if self.rolle else self.name
+
+
 STATUS_CHOICES = (
     ("Offen", "Offen"),
     ("Geschlossen", "Geschlossen"),
@@ -71,6 +88,8 @@ class Akte(ZeitstempelModell):
         return self.aktenzeichen
 
     def freeze_stammdaten(self):
+        from .utils.export import export_stammdaten, export_verlauf
+        
         self.mandant_historie = {
             "name": self.mandant.name,
             "adresse": self.mandant.adresse,
@@ -86,7 +105,11 @@ class Akte(ZeitstempelModell):
             "telefon": self.gegner.telefon,
             "email": self.gegner.email,
             "typ": self.gegner.typ,
-        }
+        } if self.gegner else {}
+        
+        # Export to files
+        export_stammdaten(self)
+        export_verlauf(self)
 
 
 class Dokument(ZeitstempelModell):

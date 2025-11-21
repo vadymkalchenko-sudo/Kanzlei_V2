@@ -84,14 +84,14 @@ class IsAdminOrReadWriteUser(permissions.BasePermission):
                 return True
             elif user_role == 'POWERUSER':
                 # POWERUSER can perform most operations including delete
-                if action in ['list', 'retrieve', 'priorisierte_akten', 'create', 'update', 'partial_update', 'upload_dokument', 'destroy', 'close_akte']:
+                if action in ['list', 'retrieve', 'priorisierte_akten', 'create', 'update', 'partial_update', 'upload_dokument', 'destroy', 'close_akte', 'search', 'organizer']:
                     logger.info(f"POWERUSER {request.user.username} darf Aktion {action} durchführen")
                     return True
                 else:
                     logger.info(f"POWERUSER {request.user.username} darf Aktion {action} NICHT durchführen")
             elif user_role == 'USER':
                 # USER can read, create, and update (but not aktenzeichen or delete)
-                if action in ['list', 'retrieve', 'priorisierte_akten', 'create']:
+                if action in ['list', 'retrieve', 'priorisierte_akten', 'create', 'search', 'organizer', 'close_akte']:
                     logger.info(f"USER {request.user.username} darf Aktion {action} durchführen")
                     return True
                 elif action in ['update', 'partial_update']:
@@ -108,7 +108,7 @@ class IsAdminOrReadWriteUser(permissions.BasePermission):
                     logger.info(f"USER {request.user.username} darf Aktion {action} NICHT durchführen")
             elif user_role == 'BETRACHTER':
                 # BETRACHTER can only read
-                if action in ['list', 'retrieve', 'priorisierte_akten']:
+                if action in ['list', 'retrieve', 'priorisierte_akten', 'search', 'organizer']:
                     logger.info(f"BETRACHTER {request.user.username} darf Aktion {action} durchführen")
                     return True
                 else:

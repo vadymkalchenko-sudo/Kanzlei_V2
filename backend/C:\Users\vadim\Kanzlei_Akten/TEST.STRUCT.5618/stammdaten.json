@@ -1,0 +1,20 @@
+{
+    "aktenzeichen": "TEST.STRUCT.5618",
+    "anlagedatum": "2025-11-21T18:43:22.872Z",
+    "status": "Geschlossen",
+    "mandant": {
+        "name": "Test Mandant Structure",
+        "adresse": "Musterstr. 1",
+        "email": "",
+        "telefon": "",
+        "typ": "Person"
+    },
+    "gegner": {
+        "name": "Test Gegner Structure",
+        "adresse": "Gegnerstr. 1",
+        "email": "",
+        "telefon": "",
+        "typ": "Person"
+    },
+    "zusatzinfo": {}
+}

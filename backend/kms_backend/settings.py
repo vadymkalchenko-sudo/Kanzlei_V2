@@ -140,7 +140,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-KANZELEI_DOCS_ROOT = os.getenv("KANZELEI_DOCS_ROOT", str(BASE_DIR / "akten_docs"))
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.getenv("MEDIA_ROOT", r"C:\Users\vadim\Kanzlei_Akten")
+KANZELEI_DOCS_ROOT = MEDIA_ROOT
 
 CORS_ALLOW_ALL_ORIGINS = True  # Added for dev
 
@@ -149,10 +151,18 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication", # Added
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle"
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "5/min",
+        "user": "100/min"
+    }
 }
 
 # JWT Settings

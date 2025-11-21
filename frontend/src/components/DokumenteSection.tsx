@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 
 interface Dokument {
     id: number;
@@ -22,21 +22,13 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
     const [editTitel, setEditTitel] = useState("");
     const [editDatum, setEditDatum] = useState("");
 
-    const getApiBaseUrl = () => {
-        const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-        return typeof envBaseUrl === "string" && envBaseUrl.length > 0
-            ? envBaseUrl
-            : "http://localhost:8000/api/";
-    };
-
     const [error, setError] = useState<string | null>(null);
 
     const fetchDokumente = async () => {
         try {
             setError(null);
-            const API_BASE_URL = getApiBaseUrl();
-            console.log(`Fetching documents for Akte ${akteId} from ${API_BASE_URL}`);
-            const response = await axios.get(`${API_BASE_URL}akten/${akteId}/`);
+            console.log(`Fetching documents for Akte ${akteId}`);
+            const response = await api.get(`akten/${akteId}/`);
             console.log("Akte response:", response.data);
             if (response.data.dokumente) {
                 console.log("Documents found:", response.data.dokumente);
@@ -94,8 +86,7 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
         formData.append('titel', file.name);
 
         try {
-            const API_BASE_URL = getApiBaseUrl();
-            await axios.post(`${API_BASE_URL}akten/${akteId}/dokumente/`, formData, {
+            await api.post(`akten/${akteId}/dokumente/`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -111,9 +102,8 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
 
     const handleDownload = async (docId: number, fileName: string) => {
         try {
-            const API_BASE_URL = getApiBaseUrl();
             // Use window.open for direct browser handling (opens PDF in new tab, downloads others)
-            const downloadUrl = `${API_BASE_URL}akten/${akteId}/dokumente/${docId}/download/`;
+            const downloadUrl = `akten/${akteId}/dokumente/${docId}/download/`;
 
             // Check if we have a token to append or if we need to use fetch to get blob
             // Since window.open can't easily send headers, we might need a different approach if auth is strict.
@@ -121,7 +111,7 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
             // Given current setup uses Bearer token in header, window.open won't send auth.
             // We stick to the blob method but trigger it differently to "open" it.
 
-            const response = await axios.get(downloadUrl, {
+            const response = await api.get(downloadUrl, {
                 responseType: 'blob',
             });
 
@@ -160,8 +150,7 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
 
     const saveEditing = async (docId: number) => {
         try {
-            const API_BASE_URL = getApiBaseUrl();
-            await axios.patch(`${API_BASE_URL}dokumente/${docId}/`, {
+            await api.patch(`dokumente/${docId}/`, {
                 titel: editTitel,
                 datum: editDatum
             });
@@ -178,8 +167,7 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
             return;
         }
         try {
-            const API_BASE_URL = getApiBaseUrl();
-            await axios.delete(`${API_BASE_URL}dokumente/${docId}/`);
+            await api.delete(`dokumente/${docId}/`);
             fetchDokumente();
         } catch (err) {
             console.error("Fehler beim Löschen", err);

@@ -8,3 +8,4 @@ class AktenverwaltungConfig(AppConfig):
     def ready(self):
         from . import storage  # noqa: F401
         storage.ensure_docs_root()
+        from . import signals  # noqa: F401

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 interface Frist {
@@ -31,19 +31,12 @@ const Header = ({ title = 'Dashboard' }: { title?: string }) => {
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [searchLoading, setSearchLoading] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
-
-    const getApiBaseUrl = () => {
-        const envBaseUrl: unknown = import.meta.env.VITE_API_BASE_URL;
-        return typeof envBaseUrl === "string" && envBaseUrl.length > 0
-            ? envBaseUrl
-            : "http://localhost:8000/api/";
-    };
+    const notificationRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const API_BASE_URL = getApiBaseUrl();
-                const response = await axios.get(`${API_BASE_URL}dashboard/`);
+                const response = await api.get('dashboard/');
                 if (response.data.priorisierte_fristen) {
                     setFristen(response.data.priorisierte_fristen);
                 }
@@ -63,8 +56,7 @@ const Header = ({ title = 'Dashboard' }: { title?: string }) => {
             if (searchQuery.length >= 2) {
                 setSearchLoading(true);
                 try {
-                    const API_BASE_URL = getApiBaseUrl();
-                    const response = await axios.get(`${API_BASE_URL}akten/search/?q=${encodeURIComponent(searchQuery)}`);
+                    const response = await api.get(`akten/search/?q=${encodeURIComponent(searchQuery)}`);
                     setSearchResults(response.data);
                     setShowSearchResults(true);
                 } catch (err) {
@@ -82,11 +74,14 @@ const Header = ({ title = 'Dashboard' }: { title?: string }) => {
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // Close search results on outside click
+    // Close search results and notifications on outside click
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
                 setShowSearchResults(false);
+            }
+            if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+                setShowNotifications(false);
             }
         };
 
@@ -142,8 +137,8 @@ const Header = ({ title = 'Dashboard' }: { title?: string }) => {
                                                     {result.aktenzeichen}
                                                 </span>
                                                 <span className={`text-xs px-2 py-0.5 rounded-full ${result.status === 'Offen' ? 'bg-green-100 text-green-700' :
-                                                        result.status === 'Geschlossen' ? 'bg-gray-100 text-gray-700' :
-                                                            'bg-blue-100 text-blue-700'
+                                                    result.status === 'Geschlossen' ? 'bg-gray-100 text-gray-700' :
+                                                        'bg-blue-100 text-blue-700'
                                                     }`}>
                                                     {result.status}
                                                 </span>
@@ -164,7 +159,7 @@ const Header = ({ title = 'Dashboard' }: { title?: string }) => {
                     </div>
 
                     {/* Notifications */}
-                    <div className="relative">
+                    <div className="relative" ref={notificationRef}>
                         <button
                             onClick={() => setShowNotifications(!showNotifications)}
                             className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
@@ -188,7 +183,9 @@ const Header = ({ title = 'Dashboard' }: { title?: string }) => {
                                                 className="p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors"
                                                 onClick={() => {
                                                     if (frist.akte_id) {
-                                                        window.location.href = `/akte/${frist.akte_id}`;
+                                                        console.log("Navigating to Akte:", frist.akte_id);
+                                                        navigate(`/akte/${frist.akte_id}`);
+                                                        setShowNotifications(false);
                                                     }
                                                 }}
                                             >

@@ -1,8 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SearchBar from './SearchBar';
+import { api } from '../services/api';
+
+interface Akte {
+  id: number;
+  aktenzeichen: string;
+  mandant: { name: string };
+  gegner: { name: string };
+  status: string;
+  anlagedatum: string;
+}
 
 const Dashboard = () => {
+  const [recentAkten, setRecentAkten] = useState<Akte[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecentAkten = async () => {
+      try {
+        const response = await api.get('akten/');
+        // Get the 5 most recent Akten
+        const akten = response.data.slice(0, 5);
+        setRecentAkten(akten);
+      } catch (error) {
+        console.error('Fehler beim Laden der Akten:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecentAkten();
+  }, []);
+
   const stats = [
     { label: 'Offene Akten', value: '24', change: '+2', trend: 'up', icon: <FolderIcon />, color: 'bg-sky-500' },
     { label: 'Fristen heute', value: '3', change: '-1', trend: 'down', icon: <ClockIcon />, color: 'bg-amber-500' },
@@ -10,13 +40,35 @@ const Dashboard = () => {
     { label: 'Statistiken', value: '156', change: '+12', trend: 'up', icon: <ChartIcon />, color: 'bg-violet-500' },
   ];
 
-  const recentAkten = [
-    { id: 1, az: '2024/001', mandant: 'Müller GmbH', gegner: 'Schmidt AG', status: 'Aktiv', update: 'Heute, 10:30' },
-    { id: 2, az: '2024/002', mandant: 'Dr. Weber', gegner: 'Allianz Vers.', status: 'Warten', update: 'Gestern, 14:15' },
-    { id: 3, az: '2024/003', mandant: 'Klaus Klein', gegner: 'Stadt München', status: 'Aktiv', update: '17.11.2024' },
-    { id: 4, az: '2024/004', mandant: 'ImmoInvest', gegner: 'Bauunternehmung', status: 'Abgeschlossen', update: '15.11.2024' },
-    { id: 5, az: '2024/005', mandant: 'Herbert Meyer', gegner: 'Deutsche Bank', status: 'Aktiv', update: '14.11.2024' },
-  ];
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return `Heute, ${date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return `Gestern, ${date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+      return date.toLocaleDateString('de-DE');
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'offen':
+      case 'in bearbeitung':
+        return 'badge-success';
+      case 'warten':
+        return 'badge-warning';
+      case 'geschlossen':
+      case 'abgeschlossen':
+        return 'badge-neutral';
+      default:
+        return 'badge-neutral';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -81,31 +133,43 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {recentAkten.map((akte) => (
-                <tr key={akte.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="font-semibold text-primary">
-                    <Link to={`/akte/${akte.id}`} className="hover:underline">{akte.az}</Link>
-                  </td>
-                  <td className="font-medium">{akte.mandant}</td>
-                  <td className="text-slate-600">{akte.gegner}</td>
-                  <td>
-                    <span className={`badge ${akte.status === 'Aktiv' ? 'badge-success' :
-                      akte.status === 'Warten' ? 'badge-warning' : 'badge-neutral'
-                      }`}>
-                      {akte.status}
-                    </span>
-                  </td>
-                  <td className="text-slate-500 text-sm">{akte.update}</td>
-                  <td className="text-right">
-                    <Link
-                      to={`/akte/${akte.id}`}
-                      className="text-primary hover:text-primary-dark font-semibold text-sm"
-                    >
-                      Bearbeiten
-                    </Link>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-slate-500">
+                    Lade Akten...
                   </td>
                 </tr>
-              ))}
+              ) : recentAkten.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-slate-500">
+                    Keine Akten vorhanden
+                  </td>
+                </tr>
+              ) : (
+                recentAkten.map((akte) => (
+                  <tr key={akte.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="font-semibold text-primary">
+                      <Link to={`/akte/${akte.id}`} className="hover:underline">{akte.aktenzeichen}</Link>
+                    </td>
+                    <td className="font-medium">{akte.mandant.name}</td>
+                    <td className="text-slate-600">{akte.gegner.name}</td>
+                    <td>
+                      <span className={`badge ${getStatusBadgeClass(akte.status)}`}>
+                        {akte.status}
+                      </span>
+                    </td>
+                    <td className="text-slate-500 text-sm">{formatDate(akte.anlagedatum)}</td>
+                    <td className="text-right">
+                      <Link
+                        to={`/akte/${akte.id}`}
+                        className="text-primary hover:text-primary-dark font-semibold text-sm"
+                      >
+                        Bearbeiten
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
