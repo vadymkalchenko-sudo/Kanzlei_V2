@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -8,6 +9,7 @@ const Login = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -21,7 +23,7 @@ const Login = () => {
             });
             console.log("Login Success. Token:", response.data.access);
 
-            localStorage.setItem('token', response.data.access);
+            login(response.data.access);
             navigate('/dashboard');
         } catch (err: any) {
             if (err.response) {

@@ -1,0 +1,146 @@
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../services/api';
+
+interface Akte {
+    id: number;
+    aktenzeichen: string;
+    mandant: { name: string };
+    gegner: { name: string };
+    status: string;
+    erstellt_am: string;
+}
+
+const AktenList = () => {
+    const [akten, setAkten] = useState<Akte[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        const fetchAkten = async () => {
+            try {
+                const response = await api.get('akten/');
+                setAkten(response.data);
+            } catch (error) {
+                console.error('Fehler beim Laden der Akten:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAkten();
+    }, []);
+
+    const filteredAkten = akten.filter(akte =>
+        akte.aktenzeichen.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        akte.mandant?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        akte.gegner?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const getStatusBadgeClass = (status: string) => {
+        switch (status.toLowerCase()) {
+            case 'offen':
+            case 'in bearbeitung':
+                return 'badge-success';
+            case 'warten':
+                return 'badge-warning';
+            case 'geschlossen':
+            case 'abgeschlossen':
+                return 'badge-neutral';
+            default:
+                return 'badge-neutral';
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-slate-900">Aktenübersicht</h2>
+                <Link to="/akten/neu" className="btn btn-accent">
+                    <PlusIcon />
+                    Neue Akte anlegen
+                </Link>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
+                <div className="mb-6">
+                    <input
+                        type="text"
+                        placeholder="Suchen nach Aktenzeichen, Mandant, Gegner..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                </div>
+
+                <div className="table-container">
+                    <table className="table">
+                        <thead>
+                            <tr>
+                                <th>Aktenzeichen</th>
+                                <th>Mandant</th>
+                                <th>Gegner</th>
+                                <th>Status</th>
+                                <th>Anlagedatum</th>
+                                <th className="text-right">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={6} className="text-center py-8 text-slate-500">
+                                        Lade Akten...
+                                    </td>
+                                </tr>
+                            ) : filteredAkten.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="text-center py-8 text-slate-500">
+                                        Keine Akten gefunden
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredAkten.map((akte) => (
+                                    <tr key={akte.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="font-mono font-medium text-slate-700">
+                                            {akte.aktenzeichen}
+                                        </td>
+                                        <td className="font-medium text-slate-900">
+                                            {akte.mandant?.name || '-'}
+                                        </td>
+                                        <td className="text-slate-600">
+                                            {akte.gegner?.name || '-'}
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${getStatusBadgeClass(akte.status)}`}>
+                                                {akte.status}
+                                            </span>
+                                        </td>
+                                        <td className="text-slate-500">
+                                            {new Date(akte.erstellt_am).toLocaleDateString('de-DE')}
+                                        </td>
+                                        <td className="text-right">
+                                            <Link
+                                                to={`/akte/${akte.id}`}
+                                                className="text-primary hover:text-primary-dark font-semibold text-sm"
+                                            >
+                                                Bearbeiten
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const PlusIcon = () => (
+    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+);
+
+export default AktenList;

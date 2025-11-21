@@ -9,7 +9,7 @@ interface Akte {
   mandant: { name: string };
   gegner: { name: string };
   status: string;
-  anlagedatum: string;
+  aktualisiert_am: string;
 }
 
 const Dashboard = () => {
@@ -93,15 +93,11 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Search Bar Test */}
-      <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Akten durchsuchen</h3>
-        <SearchBar />
-      </div>
+
 
       {/* Quick Actions */}
       <div className="flex gap-3">
-        <Link to="/akte" className="btn btn-accent">
+        <Link to="/akten/neu" className="btn btn-accent">
           <PlusIcon />
           Neue Akte anlegen
         </Link>
@@ -115,7 +111,7 @@ const Dashboard = () => {
       <div className="card">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-slate-900">Zuletzt bearbeitete Akten</h3>
-          <Link to="/akte" className="text-sm font-semibold text-primary hover:text-primary-dark">
+          <Link to="/akten" className="text-sm font-semibold text-primary hover:text-primary-dark">
             Alle anzeigen →
           </Link>
         </div>
@@ -158,7 +154,7 @@ const Dashboard = () => {
                         {akte.status}
                       </span>
                     </td>
-                    <td className="text-slate-500 text-sm">{formatDate(akte.anlagedatum)}</td>
+                    <td className="text-slate-500 text-sm">{formatDate(akte.aktualisiert_am)}</td>
                     <td className="text-right">
                       <Link
                         to={`/akte/${akte.id}`}

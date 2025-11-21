@@ -2,7 +2,7 @@ import logging
 
 import logging
 
-from django.db.models import Case, IntegerField, OuterRef, Q, Subquery, When
+from django.db.models import Case, IntegerField, OuterRef, Q, Subquery, When, ProtectedError
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -23,12 +23,20 @@ from .storage import store_document
 logger = logging.getLogger(__name__)
 
 
-
 class MandantViewSet(viewsets.ModelViewSet):
     queryset = Mandant.objects.all()
     serializer_class = MandantSerializer
     permission_classes = [IsAdminOrReadWriteUser]
     
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"error": "Dieser Eintrag kann nicht gelöscht werden, da er noch in Akten verwendet wird."},
+                status=status.HTTP_409_CONFLICT
+            )
+
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
         query = request.query_params.get("q", "")
@@ -49,6 +57,15 @@ class GegnerViewSet(viewsets.ModelViewSet):
     serializer_class = GegnerSerializer
     permission_classes = [IsAdminOrReadWriteUser]
     
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"error": "Dieser Eintrag kann nicht gelöscht werden, da er noch in Akten verwendet wird."},
+                status=status.HTTP_409_CONFLICT
+            )
+
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
         query = request.query_params.get("q", "")
@@ -69,6 +86,15 @@ class DrittbeteiligterViewSet(viewsets.ModelViewSet):
     serializer_class = DrittbeteiligterSerializer
     permission_classes = [IsAdminOrReadWriteUser]
     
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"error": "Dieser Eintrag kann nicht gelöscht werden, da er noch in Akten verwendet wird."},
+                status=status.HTTP_409_CONFLICT
+            )
+
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
         query = request.query_params.get("q", "")

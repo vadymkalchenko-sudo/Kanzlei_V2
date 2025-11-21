@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Dashboard from './components/Dashboard';
 import AktenView from './components/AktenView';
 import AkteForm from './components/AkteForm';
+import AktenList from './components/AktenList';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Settings from './components/Settings';
@@ -28,7 +29,9 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/akte" element={<AkteForm />} />
+                <Route path="/akten" element={<AktenList />} />
+                <Route path="/akten/neu" element={<AkteForm />} />
+                <Route path="/akte" element={<Navigate to="/akten/neu" replace />} />
                 <Route path="/akte/:id" element={<AktenView />} />
                 <Route path="/stammdaten" element={<Stammdaten />} />
               </Route>

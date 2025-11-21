@@ -84,9 +84,22 @@ const Stammdaten: React.FC = () => {
         setShowModal(true);
     };
 
-    const handleDelete = async (id: number, typ: BeteiligterTyp) => {
-        if (!window.confirm('Möchten Sie diesen Eintrag wirklich löschen?')) return;
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<{ id: number, typ: BeteiligterTyp } | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
+    // ... (existing code) ...
+
+    const handleDelete = (id: number, typ: BeteiligterTyp) => {
+        setItemToDelete({ id, typ });
+        setDeleteError(null);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!itemToDelete) return;
+
+        const { id, typ } = itemToDelete;
         let endpoint = '';
         switch (typ) {
             case 'mandant':
@@ -103,11 +116,27 @@ const Stammdaten: React.FC = () => {
         try {
             await api.delete(endpoint);
             fetchAll();
-        } catch (error) {
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+        } catch (error: any) {
             console.error('Fehler beim Löschen:', error);
-            alert('Fehler beim Löschen des Eintrags.');
+            if (error.response && error.response.status === 409) {
+                setDeleteError(error.response.data.error);
+            } else {
+                setDeleteError('Fehler beim Löschen des Eintrags.');
+            }
+            // Modal offen lassen, damit User den Fehler sieht
         }
     };
+
+    // ... (render) ...
+
+
+
+    // ... (render) ...
+
+
+
 
     const handleSave = async () => {
         try {
@@ -408,6 +437,46 @@ const Stammdaten: React.FC = () => {
                             >
                                 Speichern
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-xl font-bold text-slate-900 mb-4">Eintrag löschen?</h3>
+
+                        {deleteError ? (
+                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+                                {deleteError}
+                            </div>
+                        ) : (
+                            <p className="text-slate-600 mb-6">
+                                Möchten Sie diesen Eintrag wirklich unwiderruflich löschen?
+                            </p>
+                        )}
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowDeleteModal(false);
+                                    setItemToDelete(null);
+                                    setDeleteError(null);
+                                }}
+                                className="btn btn-secondary"
+                            >
+                                {deleteError ? 'Schließen' : 'Abbrechen'}
+                            </button>
+                            {!deleteError && (
+                                <button
+                                    onClick={confirmDelete}
+                                    className="btn bg-red-600 text-white hover:bg-red-700"
+                                >
+                                    Löschen
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Settings = () => {
     const ADMIN_URL = "http://localhost:8000/admin/";
     const navigate = useNavigate();
+    const { logout } = useAuth();
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
+        logout();
         navigate('/login');
     };
 
