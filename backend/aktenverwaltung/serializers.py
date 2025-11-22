@@ -104,8 +104,14 @@ class AkteSerializer(serializers.ModelSerializer):
             "dokumenten_pfad_root",
             "dokumente",
             "erstellt_am",
+            "erstellt_am",
             "aktualisiert_am",
+            "modus_operandi",
+            "drittbeteiligte",
         ]
+        extra_kwargs = {
+            "drittbeteiligte": {"required": False}
+        }
         read_only_fields = (
             "mandant_historie",
             "gegner_historie",

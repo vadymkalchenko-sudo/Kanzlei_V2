@@ -162,7 +162,45 @@ const AktenList = () => {
                     </table>
                 </div>
             </div>
-        </div>
+
+            {/* Delete Confirmation Modal */}
+            {
+                showDeleteModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+                            <h3 className="text-xl font-bold text-slate-900 mb-4">Akte löschen?</h3>
+                            {deleteError ? (
+                                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+                                    {deleteError}
+                                </div>
+                            ) : (
+                                <p className="text-slate-600 mb-6">Möchten Sie diese Akte wirklich unwiderruflich löschen?</p>
+                            )}
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setAkteToDelete(null);
+                                        setDeleteError(null);
+                                    }}
+                                    className="btn btn-secondary"
+                                >
+                                    {deleteError ? 'Schließen' : 'Abbrechen'}
+                                </button>
+                                {!deleteError && (
+                                    <button
+                                        onClick={confirmDelete}
+                                        className="btn bg-red-600 text-white hover:bg-red-700"
+                                    >
+                                        Löschen
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 

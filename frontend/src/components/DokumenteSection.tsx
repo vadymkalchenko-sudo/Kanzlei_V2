@@ -86,12 +86,17 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
         formData.append('titel', file.name);
 
         try {
-            await api.post(`akten/${akteId}/dokumente/`, formData, {
+            const response = await api.post(`akten/${akteId}/dokumente/`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-            fetchDokumente();
+            // Immediately update state with new document
+            if (response.data) {
+                setDokumente(prev => [...prev, response.data]);
+            } else {
+                fetchDokumente(); // Fallback
+            }
         } catch (err) {
             console.error("Fehler beim Upload", err);
             alert("Fehler beim Upload der Datei.");
@@ -102,25 +107,27 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
 
     const handleDownload = async (docId: number, fileName: string) => {
         try {
-            // Use window.open for direct browser handling (opens PDF in new tab, downloads others)
             const downloadUrl = `akten/${akteId}/dokumente/${docId}/download/`;
-
-            // Check if we have a token to append or if we need to use fetch to get blob
-            // Since window.open can't easily send headers, we might need a different approach if auth is strict.
-            // However, for "direct open", usually a signed URL or cookie auth is best.
-            // Given current setup uses Bearer token in header, window.open won't send auth.
-            // We stick to the blob method but trigger it differently to "open" it.
-
             const response = await api.get(downloadUrl, {
                 responseType: 'blob',
             });
 
-            const file = new Blob([response.data], { type: response.headers['content-type'] });
+            // Determine MIME type
+            let mimeType = response.headers['content-type'];
+            const ext = fileName.split('.').pop()?.toLowerCase();
+
+            // Force correct MIME type for Word documents if not set correctly
+            if (ext === 'docx') {
+                mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            } else if (ext === 'doc') {
+                mimeType = 'application/msword';
+            }
+
+            const file = new Blob([response.data], { type: mimeType });
             const fileURL = URL.createObjectURL(file);
 
             // Open in new tab if possible (PDF, images), otherwise download
-            const type = response.headers['content-type'];
-            if (type === 'application/pdf' || type.startsWith('image/')) {
+            if (mimeType === 'application/pdf' || mimeType?.startsWith('image/')) {
                 window.open(fileURL, '_blank');
             } else {
                 const link = document.createElement('a');
@@ -130,6 +137,9 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
                 link.click();
                 link.remove();
             }
+
+            // Cleanup
+            setTimeout(() => URL.revokeObjectURL(fileURL), 1000);
         } catch (err) {
             console.error("Fehler beim Download", err);
             alert("Fehler beim Herunterladen der Datei.");

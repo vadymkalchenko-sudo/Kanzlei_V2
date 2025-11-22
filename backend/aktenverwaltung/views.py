@@ -279,6 +279,7 @@ class AkteViewSet(viewsets.ModelViewSet):
             titel=titel or upload.name,
             dateiname=upload.name,
             pfad_auf_server=relative_path,
+            datum=timezone.now().date(),
         )
 
         serializer = DokumentSerializer(dokument)
@@ -317,16 +318,27 @@ class AkteViewSet(viewsets.ModelViewSet):
         
         # Überprüfen, ob die Datei existiert
         if not os.path.exists(file_path):
-            return Response(
-                {"detail": "Datei existiert nicht."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            # Fallback: Prüfe, ob der Pfad wegen Slash-Ersetzung abweicht (für alte Uploads)
+            safe_aktenzeichen = akte.aktenzeichen.replace("/", "_")
+            filename = os.path.basename(dokument.pfad_auf_server)
+            fallback_path = os.path.join(media_root, safe_aktenzeichen, filename)
+            
+            if os.path.exists(fallback_path):
+                file_path = fallback_path
+            else:
+                return Response(
+                    {"detail": "Datei existiert nicht."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
         
         # Datei als Download bereitstellen
+        import mimetypes
+        content_type, encoding = mimetypes.guess_type(file_path)
         response = FileResponse(
             open(file_path, 'rb'),
             as_attachment=True,
-            filename=dokument.dateiname
+            filename=dokument.dateiname,
+            content_type=content_type or 'application/octet-stream'
         )
         return response
 

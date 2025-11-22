@@ -79,6 +79,9 @@ class Akte(ZeitstempelModell):
     gegner_historie = models.JSONField(default=dict, blank=True)
 
     dokumenten_pfad_root = models.CharField(max_length=255, blank=True)
+    
+    modus_operandi = models.CharField(max_length=255, blank=True)
+    drittbeteiligte = models.ManyToManyField(Drittbeteiligter, blank=True, related_name="akten")
 
     class Meta:
         ordering = ["-aktualisiert_am"]

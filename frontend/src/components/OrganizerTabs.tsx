@@ -31,6 +31,9 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [newItem, setNewItem] = useState<OrganizerItem>({ titel: '', beschreibung: '', status: 'offen', zugewiesen_an: null });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<OrganizerItem | null>(null);
+  const [editFormData, setEditFormData] = useState<OrganizerItem>({ titel: '', beschreibung: '' });
 
   const fetchItems = async () => {
     try {
@@ -127,58 +130,59 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
     }
   };
 
-  const handleEdit = async (item: OrganizerItem) => {
-    // TODO: Implement proper edit modal instead of window.prompt
-    console.log('Edit clicked for item:', item);
-    alert(`Bearbeiten-Funktion für "${item.titel}" wird noch implementiert. Bitte verwenden Sie vorerst "Löschen" und neu erstellen.`);
+  const handleEdit = (item: OrganizerItem) => {
+    setEditingItem(item);
+    setEditFormData({
+      ...item,
+      datum: item.datum || item.faellig_am || '', // Normalize date
+    });
+    setShowEditModal(true);
+  };
 
-    /* Original code with prompts - disabled because prompts are blocked
-    const newTitle = window.prompt('Neuer Titel:', item.titel);
-    if (!newTitle) return;
-
-    const newDescription = window.prompt('Neue Beschreibung:', item.beschreibung);
-    if (newDescription === null) return;
+  const saveEdit = async () => {
+    if (!editingItem) return;
 
     try {
       let endpoint = '';
       let payload: any = {};
 
       if (activeTab === 'Aufgabe') {
-        endpoint = `organizer/aufgaben/${item.id}/`;
+        endpoint = `organizer/aufgaben/${editingItem.id}/`;
         payload = {
           akte: akteId,
-          titel: newTitle,
-          beschreibung: newDescription,
-          status: item.status?.toLowerCase() || 'offen',
-          faellig_am: item.faellig_am || item.datum,
-          zugewiesen_an: item.zugewiesen_an,
+          titel: editFormData.titel,
+          beschreibung: editFormData.beschreibung,
+          status: editFormData.status?.toLowerCase() || 'offen',
+          faellig_am: editFormData.datum,
+          zugewiesen_an: editFormData.zugewiesen_an,
         };
       } else if (activeTab === 'Frist') {
-        endpoint = `organizer/fristen/${item.id}/`;
+        endpoint = `organizer/fristen/${editingItem.id}/`;
         payload = {
           akte: akteId,
-          bezeichnung: newTitle,
-          beschreibung: newDescription,
-          frist_datum: item.datum || new Date().toISOString().split('T')[0],
+          bezeichnung: editFormData.titel,
+          beschreibung: editFormData.beschreibung,
+          frist_datum: editFormData.datum || new Date().toISOString().split('T')[0],
           prioritaet: 'mittel',
           erledigt: false,
         };
       } else if (activeTab === 'Notiz') {
-        endpoint = `organizer/notizen/${item.id}/`;
+        endpoint = `organizer/notizen/${editingItem.id}/`;
         payload = {
           akte: akteId,
-          titel: newTitle,
-          inhalt: newDescription,
+          titel: editFormData.titel,
+          inhalt: editFormData.beschreibung,
         };
       }
 
       await api.put(endpoint, payload);
       fetchItems();
+      setShowEditModal(false);
+      setEditingItem(null);
     } catch (err) {
       console.error(`Fehler beim Bearbeiten von ${activeTab}`, err);
       alert(`Fehler beim Bearbeiten.`);
     }
-    */
   };
 
   const filteredItems = items.filter(item => item.typ === activeTab);
@@ -336,7 +340,99 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
           </tbody>
         </table>
       </div>
-    </div>
+
+      {/* Edit Modal */}
+      {
+        showEditModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-slate-900 mb-4">{activeTab} bearbeiten</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Titel</label>
+                  <input
+                    type="text"
+                    className="input w-full"
+                    value={editFormData.titel}
+                    onChange={(e) => setEditFormData({ ...editFormData, titel: e.target.value })}
+                  />
+                </div>
+
+                {(activeTab === 'Frist' || activeTab === 'Aufgabe') && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">
+                      {activeTab === 'Frist' ? 'Frist-Datum' : 'Fällig am'}
+                    </label>
+                    <input
+                      type="date"
+                      className="input w-full"
+                      value={editFormData.datum || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, datum: e.target.value })}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Beschreibung</label>
+                  <textarea
+                    className="input w-full min-h-[100px]"
+                    value={editFormData.beschreibung}
+                    onChange={(e) => setEditFormData({ ...editFormData, beschreibung: e.target.value })}
+                  />
+                </div>
+
+                {activeTab === 'Aufgabe' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+                      <select
+                        className="input w-full"
+                        value={editFormData.status || 'offen'}
+                        onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                      >
+                        <option value="offen">Offen</option>
+                        <option value="erledigt">Erledigt</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Zugewiesen an</label>
+                      <select
+                        className="input w-full"
+                        value={editFormData.zugewiesen_an || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, zugewiesen_an: e.target.value ? parseInt(e.target.value) : null })}
+                      >
+                        <option value="">Nicht zugewiesen</option>
+                        {users.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex gap-3 justify-end mt-6">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="btn btn-secondary"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={saveEdit}
+                  className="btn btn-primary"
+                >
+                  Speichern
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 };
 

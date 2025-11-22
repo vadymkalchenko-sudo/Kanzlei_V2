@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import OrganizerTabs from './OrganizerTabs';
 import FinanzTabelle from './FinanzTabelle';
-import DokumenteSection from './DokumenteSection';
+import VerlaufSection from './VerlaufSection';
+import AufgabenFristenSection from './AufgabenFristenSection';
+import DrittbeteiligteList from './DrittbeteiligteList';
+import Fragebogen from './Fragebogen';
 import { api } from '../services/api';
 
 interface Mandant {
@@ -28,6 +30,7 @@ interface Akte {
   betreff: string;
   status: string;
   anlagedatum: string;
+  modus_operandi: string;
   mandant: Mandant;
   gegner: Gegner;
 }
@@ -38,9 +41,15 @@ const AktenView: React.FC = () => {
   const [akte, setAkte] = useState<Akte | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'akte' | 'finanzen'>('akte');
+
+  // Tabs: 'akte', 'drittbeteiligte', 'fragebogen', 'finanzen'
+  const [activeTab, setActiveTab] = useState<'akte' | 'drittbeteiligte' | 'fragebogen' | 'finanzen'>('akte');
+
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+
+  // Modus Operandi State
+  const [modusOperandi, setModusOperandi] = useState("");
 
   useEffect(() => {
     const fetchAkte = async () => {
@@ -56,6 +65,7 @@ const AktenView: React.FC = () => {
           betreff: `${data.mandant?.name || 'Unbekannt'} ./. ${data.gegner?.name || 'Unbekannt'}`,
           status: data.status,
           anlagedatum: new Date(data.erstellt_am).toLocaleDateString('de-DE'),
+          modus_operandi: data.modus_operandi || "",
           mandant: {
             name: data.mandant?.name || '',
             adresse: data.mandant?.adresse || '',
@@ -67,11 +77,12 @@ const AktenView: React.FC = () => {
             adresse: data.gegner?.adresse || '',
             telefon: data.gegner?.telefon || '',
             email: data.gegner?.email || '',
-            vertreter: '' // Backend doesn't seem to provide this explicitly in the serializer yet
+            vertreter: ''
           }
         };
 
         setAkte(mappedAkte);
+        setModusOperandi(mappedAkte.modus_operandi);
         setError(null);
       } catch (err) {
         console.error("Fehler beim Laden der Akte:", err);
@@ -88,13 +99,22 @@ const AktenView: React.FC = () => {
     setIsClosing(true);
     try {
       await api.post(`akten/${id}/schliessen/`);
-      // Reload to update status
       window.location.reload();
     } catch (err) {
       console.error("Fehler beim Schließen der Akte", err);
       alert("Fehler beim Schließen der Akte.");
       setIsClosing(false);
       setShowCloseModal(false);
+    }
+  };
+
+  const saveModusOperandi = async () => {
+    if (!id) return;
+    try {
+      await api.patch(`akten/${id}/`, { modus_operandi: modusOperandi });
+      console.log("Modus Operandi gespeichert");
+    } catch (err) {
+      console.error("Fehler beim Speichern Modus Operandi", err);
     }
   };
 
@@ -142,16 +162,30 @@ const AktenView: React.FC = () => {
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-xl shadow-md p-6 border border-slate-200">
-        <div>
+        <div className="flex-grow">
           <div className="flex items-center gap-3 mb-2">
             <h2 className="text-2xl font-bold text-slate-900">{akte.betreff}</h2>
             <span className="badge badge-success text-sm">{akte.status}</span>
           </div>
-          <p className="text-slate-600">
-            <span className="font-semibold">Aktenzeichen:</span> <span className="font-mono text-primary font-semibold">{akte.az}</span>
-            <span className="mx-2">•</span>
-            <span className="font-semibold">Angelegt am:</span> {akte.anlagedatum}
-          </p>
+          <div className="flex flex-col md:flex-row md:items-center gap-4 text-slate-600">
+            <div>
+              <span className="font-semibold">Aktenzeichen:</span> <span className="font-mono text-primary font-semibold">{akte.az}</span>
+            </div>
+
+            {/* Modus Operandi Input */}
+            <div className="flex items-center gap-2 flex-grow max-w-xl">
+              <span className="font-semibold whitespace-nowrap">Modus Operandi:</span>
+              <input
+                type="text"
+                className="input input-sm w-full border-transparent hover:border-slate-300 focus:border-primary bg-transparent focus:bg-white transition-all"
+                placeholder="Freieingabe..."
+                value={modusOperandi}
+                onChange={(e) => setModusOperandi(e.target.value)}
+                onBlur={saveModusOperandi}
+                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+              />
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -171,8 +205,8 @@ const AktenView: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="border-b border-border">
-        <nav className="-mb-px flex space-x-8">
+      <div className="border-b border-border overflow-x-auto">
+        <nav className="-mb-px flex space-x-8 min-w-max">
           <button
             onClick={() => setActiveTab('akte')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'akte'
@@ -181,6 +215,24 @@ const AktenView: React.FC = () => {
               }`}
           >
             Akte & Details
+          </button>
+          <button
+            onClick={() => setActiveTab('drittbeteiligte')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'drittbeteiligte'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
+              }`}
+          >
+            Drittbeteiligte
+          </button>
+          <button
+            onClick={() => setActiveTab('fragebogen')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'fragebogen'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
+              }`}
+          >
+            Fragebogen
           </button>
           <button
             onClick={() => setActiveTab('finanzen')}
@@ -259,17 +311,35 @@ const AktenView: React.FC = () => {
               </div>
             </div>
 
-            {/* Dokumente Section */}
-            <div className="card">
-              <h3 className="text-lg font-bold text-secondary mb-4">Dokumente</h3>
-              <DokumenteSection akteId={id || ''} />
-            </div>
+            {/* Main Content Split View */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* Left Column: Verlauf (2/3 width on large screens) */}
+              <div className="xl:col-span-2">
+                <div className="card h-full">
+                  <VerlaufSection akteId={id || ''} />
+                </div>
+              </div>
 
-            {/* Organizer Section */}
-            <div className="card">
-              <h3 className="text-lg font-bold text-secondary mb-4">Organizer</h3>
-              <OrganizerTabs akteId={id || ''} />
+              {/* Right Column: Aufgaben/Fristen (1/3 width) */}
+              <div className="xl:col-span-1">
+                <div className="card h-full sticky top-6">
+                  <h3 className="text-lg font-bold text-secondary mb-4">Aufgaben & Fristen</h3>
+                  <AufgabenFristenSection akteId={id || ''} />
+                </div>
+              </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'drittbeteiligte' && (
+          <div className="animate-fadeIn">
+            <DrittbeteiligteList />
+          </div>
+        )}
+
+        {activeTab === 'fragebogen' && (
+          <div className="animate-fadeIn">
+            <Fragebogen />
           </div>
         )}
 

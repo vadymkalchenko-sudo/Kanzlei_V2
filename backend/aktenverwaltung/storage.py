@@ -42,6 +42,7 @@ def store_document(akte, upload) -> str:
     except Exception:
         pass
 
-    relative_path = f"{akte.aktenzeichen}/{filename}"
+    safe_name = akte.aktenzeichen.replace("/", "_")
+    relative_path = f"{safe_name}/{filename}"
     return relative_path
 
