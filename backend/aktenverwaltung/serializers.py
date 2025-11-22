@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Akte, Dokument, Mandant, Gegner, Drittbeteiligter
+from .models import Akte, Dokument, Mandant, Gegner, Drittbeteiligter, AkteDrittbeteiligter
 
 
 class MandantSerializer(serializers.ModelSerializer):
@@ -52,6 +52,24 @@ class DrittbeteiligterSerializer(serializers.ModelSerializer):
         ]
 
 
+class AkteDrittbeteiligterSerializer(serializers.ModelSerializer):
+    """Serializer for Akte-Drittbeteiligter relationship with role"""
+    drittbeteiligter = DrittbeteiligterSerializer(read_only=True)
+    drittbeteiligter_id = serializers.IntegerField(write_only=True, required=False)
+    
+    class Meta:
+        model = AkteDrittbeteiligter
+        fields = [
+            "id",
+            "drittbeteiligter",
+            "drittbeteiligter_id",
+            "rolle",
+            "erstellt_am",
+            "aktualisiert_am",
+        ]
+        read_only_fields = ("erstellt_am", "aktualisiert_am")
+
+
 class DokumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dokument
@@ -87,6 +105,7 @@ class AkteSerializer(serializers.ModelSerializer):
     )
     
     dokumente = DokumentSerializer(many=True, read_only=True)
+    akte_drittbeteiligte = AkteDrittbeteiligterSerializer(many=True, read_only=True)
     
     class Meta:
         model = Akte
@@ -108,6 +127,7 @@ class AkteSerializer(serializers.ModelSerializer):
             "aktualisiert_am",
             "modus_operandi",
             "drittbeteiligte",
+            "akte_drittbeteiligte",
         ]
         extra_kwargs = {
             "drittbeteiligte": {"required": False}

@@ -401,6 +401,122 @@ class AkteViewSet(viewsets.ModelViewSet):
         
         return Response(results)
 
+    @action(detail=True, methods=["post"], url_path="add_drittbeteiligter")
+    def add_drittbeteiligter(self, request, pk=None):
+        """
+        Fügt einen Drittbeteiligten zur Akte hinzu (neu oder existierend)
+        """
+        from .models import AkteDrittbeteiligter
+        
+        akte = self.get_object()
+        drittbeteiligter_id = request.data.get("drittbeteiligter_id")
+        rolle = request.data.get("rolle", "")
+        
+        if drittbeteiligter_id:
+            # Existierenden Drittbeteiligten verknüpfen
+            try:
+                drittbeteiligter = Drittbeteiligter.objects.get(pk=drittbeteiligter_id)
+            except Drittbeteiligter.DoesNotExist:
+                return Response(
+                    {"detail": "Drittbeteiligter nicht gefunden."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Prüfe ob bereits verknüpft
+            if AkteDrittbeteiligter.objects.filter(akte=akte, drittbeteiligter=drittbeteiligter).exists():
+                return Response(
+                    {"detail": "Dieser Drittbeteiligte ist bereits mit dieser Akte verknüpft."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            # Neuen Drittbeteiligten erstellen
+            # Duplikat-Check: Name + Email
+            name = request.data.get("name", "").strip()
+            email = request.data.get("email", "").strip()
+            
+            if not name:
+                return Response(
+                    {"detail": "Name ist erforderlich."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Suche nach Duplikaten
+            existing = None
+            if email:
+                existing = Drittbeteiligter.objects.filter(name__iexact=name, email__iexact=email).first()
+            else:
+                existing = Drittbeteiligter.objects.filter(name__iexact=name).first()
+            
+            if existing:
+                drittbeteiligter = existing
+            else:
+                # Erstelle neuen Drittbeteiligten
+                drittbeteiligter = Drittbeteiligter.objects.create(
+                    name=name,
+                    adresse=request.data.get("adresse", ""),
+                    telefon=request.data.get("telefon", ""),
+                    email=email,
+                    typ=request.data.get("typ", "Person"),
+                    notizen=request.data.get("notizen", ""),
+                )
+        
+        # Verknüpfung erstellen
+        if AkteDrittbeteiligter.objects.filter(akte=akte, drittbeteiligter=drittbeteiligter).exists():
+            return Response(
+                {"detail": "Dieser Drittbeteiligte ist bereits mit dieser Akte verknüpft."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        akte_drittbeteiligter = AkteDrittbeteiligter.objects.create(
+            akte=akte,
+            drittbeteiligter=drittbeteiligter,
+            rolle=rolle
+        )
+        
+        from .serializers import AkteDrittbeteiligterSerializer
+        serializer = AkteDrittbeteiligterSerializer(akte_drittbeteiligter)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["delete"], url_path="remove_drittbeteiligter/(?P<link_id>[^/.]+)")
+    def remove_drittbeteiligter(self, request, pk=None, link_id=None):
+        """
+        Entfernt einen Drittbeteiligten von der Akte
+        """
+        from .models import AkteDrittbeteiligter
+        
+        akte = self.get_object()
+        try:
+            link = AkteDrittbeteiligter.objects.get(pk=link_id, akte=akte)
+            link.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except AkteDrittbeteiligter.DoesNotExist:
+            return Response(
+                {"detail": "Verknüpfung nicht gefunden."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=["patch"], url_path="update_drittbeteiligter_rolle/(?P<link_id>[^/.]+)")
+    def update_drittbeteiligter_rolle(self, request, pk=None, link_id=None):
+        """
+        Aktualisiert die Rolle eines Drittbeteiligten
+        """
+        from .models import AkteDrittbeteiligter
+        
+        akte = self.get_object()
+        try:
+            link = AkteDrittbeteiligter.objects.get(pk=link_id, akte=akte)
+            link.rolle = request.data.get("rolle", "")
+            link.save()
+            
+            from .serializers import AkteDrittbeteiligterSerializer
+            serializer = AkteDrittbeteiligterSerializer(link)
+            return Response(serializer.data)
+        except AkteDrittbeteiligter.DoesNotExist:
+            return Response(
+                {"detail": "Verknüpfung nicht gefunden."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
 
 class AdressbuchViewSet(ViewSet):
     """

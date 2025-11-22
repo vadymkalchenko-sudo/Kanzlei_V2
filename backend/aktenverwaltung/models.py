@@ -67,6 +67,20 @@ STATUS_CHOICES = (
 )
 
 
+class AkteDrittbeteiligter(ZeitstempelModell):
+    """Intermediate model for Akte-Drittbeteiligter relationship with role"""
+    akte = models.ForeignKey('Akte', on_delete=models.CASCADE, related_name='akte_drittbeteiligte')
+    drittbeteiligter = models.ForeignKey(Drittbeteiligter, on_delete=models.CASCADE, related_name='akte_verknuepfungen')
+    rolle = models.CharField(max_length=100, blank=True, help_text="Rolle des Drittbeteiligten in dieser Akte")
+
+    class Meta:
+        unique_together = ('akte', 'drittbeteiligter')
+        ordering = ['erstellt_am']
+
+    def __str__(self):
+        return f"{self.drittbeteiligter.name} - {self.rolle or 'Keine Rolle'} (Akte: {self.akte.aktenzeichen})"
+
+
 class Akte(ZeitstempelModell):
     aktenzeichen = models.CharField(max_length=50, unique=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="Offen")
@@ -77,11 +91,17 @@ class Akte(ZeitstempelModell):
     info_zusatz = models.JSONField(default=dict, blank=True)
     mandant_historie = models.JSONField(default=dict, blank=True)
     gegner_historie = models.JSONField(default=dict, blank=True)
+    drittbeteiligte_historie = models.JSONField(default=dict, blank=True)
 
     dokumenten_pfad_root = models.CharField(max_length=255, blank=True)
     
     modus_operandi = models.CharField(max_length=255, blank=True)
-    drittbeteiligte = models.ManyToManyField(Drittbeteiligter, blank=True, related_name="akten")
+    drittbeteiligte = models.ManyToManyField(
+        Drittbeteiligter, 
+        through='AkteDrittbeteiligter',
+        blank=True, 
+        related_name="akten"
+    )
 
     class Meta:
         ordering = ["-aktualisiert_am"]
@@ -91,7 +111,7 @@ class Akte(ZeitstempelModell):
         return self.aktenzeichen
 
     def freeze_stammdaten(self):
-        from .utils.export import export_stammdaten, export_verlauf
+        from .utils.export import export_stammdaten, export_verlauf, export_stammdaten_pdf
         
         self.mandant_historie = {
             "name": self.mandant.name,
@@ -109,10 +129,25 @@ class Akte(ZeitstempelModell):
             "email": self.gegner.email,
             "typ": self.gegner.typ,
         } if self.gegner else {}
+
+        # Drittbeteiligte Historie
+        drittbeteiligte_list = []
+        for link in self.akte_drittbeteiligte.select_related('drittbeteiligter').all():
+            drittbeteiligte_list.append({
+                "name": link.drittbeteiligter.name,
+                "rolle": link.rolle,
+                "typ": link.drittbeteiligter.typ,
+                "adresse": link.drittbeteiligter.adresse,
+                "telefon": link.drittbeteiligter.telefon,
+                "email": link.drittbeteiligter.email,
+                "notizen": link.drittbeteiligter.notizen
+            })
+        self.drittbeteiligte_historie = {"drittbeteiligte": drittbeteiligte_list}
         
         # Export to files
         export_stammdaten(self)
         export_verlauf(self)
+        export_stammdaten_pdf(self)
 
 
 class Dokument(ZeitstempelModell):

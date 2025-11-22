@@ -7,3 +7,4 @@ djangorestframework-simplejwt>=5.3.1
 setuptools
 python-dotenv
 django-filter
+reportlab>=4.0.0

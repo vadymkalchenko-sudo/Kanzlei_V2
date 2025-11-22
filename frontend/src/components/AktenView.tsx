@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import FinanzTabelle from './FinanzTabelle';
 import VerlaufSection from './VerlaufSection';
 import AufgabenFristenSection from './AufgabenFristenSection';
@@ -38,12 +38,28 @@ interface Akte {
 const AktenView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [akte, setAkte] = useState<Akte | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Tabs: 'akte', 'drittbeteiligte', 'fragebogen', 'finanzen'
-  const [activeTab, setActiveTab] = useState<'akte' | 'drittbeteiligte' | 'fragebogen' | 'finanzen'>('akte');
+  const [activeTab, setActiveTab] = useState<'akte' | 'drittbeteiligte' | 'fragebogen' | 'finanzen'>(
+    (searchParams.get('tab') as any) || 'akte'
+  );
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['akte', 'drittbeteiligte', 'fragebogen', 'finanzen'].includes(tab)) {
+      setActiveTab(tab as any);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'akte' | 'drittbeteiligte' | 'fragebogen' | 'finanzen') => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -208,7 +224,7 @@ const AktenView: React.FC = () => {
       <div className="border-b border-border overflow-x-auto">
         <nav className="-mb-px flex space-x-8 min-w-max">
           <button
-            onClick={() => setActiveTab('akte')}
+            onClick={() => handleTabChange('akte')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'akte'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
@@ -217,7 +233,7 @@ const AktenView: React.FC = () => {
             Akte & Details
           </button>
           <button
-            onClick={() => setActiveTab('drittbeteiligte')}
+            onClick={() => handleTabChange('drittbeteiligte')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'drittbeteiligte'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
@@ -226,7 +242,7 @@ const AktenView: React.FC = () => {
             Drittbeteiligte
           </button>
           <button
-            onClick={() => setActiveTab('fragebogen')}
+            onClick={() => handleTabChange('fragebogen')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'fragebogen'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
@@ -235,7 +251,7 @@ const AktenView: React.FC = () => {
             Fragebogen
           </button>
           <button
-            onClick={() => setActiveTab('finanzen')}
+            onClick={() => handleTabChange('finanzen')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'finanzen'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-secondary hover:border-gray-300'
@@ -333,7 +349,7 @@ const AktenView: React.FC = () => {
 
         {activeTab === 'drittbeteiligte' && (
           <div className="animate-fadeIn">
-            <DrittbeteiligteList />
+            <DrittbeteiligteList akteId={id || ''} />
           </div>
         )}
 

@@ -23,22 +23,36 @@ const Stammdaten: React.FC = () => {
     const [drittbeteiligte, setDrittbeteiligte] = useState<Beteiligter[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<BeteiligterTyp>('mandant');
+
+    // Initialize activeTab from URL parameter
+    const [activeTab, setActiveTab] = useState<BeteiligterTyp>(
+        (searchParams.get('tab') as BeteiligterTyp) || 'mandant'
+    );
+
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState<Beteiligter | null>(null);
     const [formData, setFormData] = useState<Partial<Beteiligter>>({});
 
+    // Role Selection Modal State
+    const [showRoleModal, setShowRoleModal] = useState(false);
+    const [selectedForRole, setSelectedForRole] = useState<Beteiligter | null>(null);
+    const [roleInput, setRoleInput] = useState('');
+
     // Check URL parameters for tab and returnTo
     const tabParam = searchParams.get('tab') as BeteiligterTyp | null;
     const returnTo = searchParams.get('returnTo');
+    const mode = searchParams.get('mode');
 
     useEffect(() => {
-        // Set tab from URL parameter if present
+        // Set tab from URL parameter if present (updates if URL changes)
         if (tabParam && ['mandant', 'gegner', 'drittbeteiligter'].includes(tabParam)) {
             setActiveTab(tabParam);
         }
-        fetchAll();
     }, [tabParam]);
+
+    useEffect(() => {
+        fetchAll();
+    }, []);
 
     const fetchAll = async () => {
         try {
@@ -88,8 +102,6 @@ const Stammdaten: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<{ id: number, typ: BeteiligterTyp } | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
-    // ... (existing code) ...
-
     const handleDelete = (id: number, typ: BeteiligterTyp) => {
         setItemToDelete({ id, typ });
         setDeleteError(null);
@@ -125,18 +137,8 @@ const Stammdaten: React.FC = () => {
             } else {
                 setDeleteError('Fehler beim Löschen des Eintrags.');
             }
-            // Modal offen lassen, damit User den Fehler sieht
         }
     };
-
-    // ... (render) ...
-
-
-
-    // ... (render) ...
-
-
-
 
     const handleSave = async () => {
         try {
@@ -176,28 +178,63 @@ const Stammdaten: React.FC = () => {
     };
 
     const handleDoubleClick = (item: Beteiligter) => {
-        if (!returnTo) return; // Only handle double-click in selection mode
+        console.log("Double Click:", item.name, "Mode:", mode, "ActiveTab:", activeTab);
 
-        // Save ONLY the ID to localStorage
-        if (activeTab === 'mandant') {
-            localStorage.setItem('selectedMandantId', item.id.toString());
-        } else if (activeTab === 'gegner') {
-            localStorage.setItem('selectedGegnerId', item.id.toString());
+        // Handle selection mode for Drittbeteiligte
+        if (mode === 'select' && activeTab === 'drittbeteiligter') {
+            setSelectedForRole(item);
+            setRoleInput('');
+            setShowRoleModal(true);
+            return;
         }
 
-        // Force full page reload to trigger useEffect in AkteForm
-        setTimeout(() => {
-            window.location.href = returnTo;
-        }, 200);
+        // Original logic for Mandant/Gegner
+        if (returnTo) {
+            // Selection mode for Mandant/Gegner (New Akte flow)
+            if (activeTab === 'mandant') {
+                localStorage.setItem('selectedMandantId', item.id.toString());
+            } else if (activeTab === 'gegner') {
+                localStorage.setItem('selectedGegnerId', item.id.toString());
+            }
+
+            // Force full page reload to trigger useEffect in AkteForm
+            setTimeout(() => {
+                window.location.href = returnTo;
+            }, 200);
+        } else if (!mode) {
+            // Edit mode (only if not in selection mode)
+            handleEdit(item);
+        }
+    };
+
+    const handleRoleSubmit = () => {
+        if (!selectedForRole) return;
+
+        // Store selection in localStorage
+        localStorage.setItem('selected_drittbeteiligter_id', selectedForRole.id.toString());
+        if (roleInput) {
+            localStorage.setItem('selected_drittbeteiligter_rolle', roleInput);
+        }
+
+        // Navigate back to Akte
+        const akteId = localStorage.getItem('return_to_akte_id');
+        if (akteId) {
+            localStorage.removeItem('return_to_akte_id');
+            window.location.href = `/akte/${akteId}?tab=drittbeteiligte`;
+        }
+        setShowRoleModal(false);
     };
 
     return (
         <div className="space-y-6">
             {/* Selection Mode Banner */}
-            {returnTo && (
+            {(returnTo || (mode === 'select' && activeTab === 'drittbeteiligter')) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <p className="text-blue-800 font-semibold">
-                        Auswahl-Modus: Doppelklicken Sie auf den Namen eines {getTabLabel(activeTab).slice(0, -1)}, um ihn auszuwählen
+                        {activeTab === 'drittbeteiligter'
+                            ? "Auswahl-Modus: Doppelklicken Sie auf einen Drittbeteiligten, um ihn auszuwählen"
+                            : `Auswahl-Modus: Doppelklicken Sie auf den Namen eines ${activeTab === 'mandant' ? 'Mandanten' : 'Gegners'}, um ihn auszuwählen`
+                        }
                     </p>
                 </div>
             )}
@@ -282,12 +319,10 @@ const Stammdaten: React.FC = () => {
                                 getCurrentData().map((item) => (
                                     <tr
                                         key={item.id}
-                                        className={`hover:bg-slate-50 transition-colors ${returnTo ? 'cursor-pointer' : ''}`}
+                                        className={`hover:bg-slate-50 transition-colors ${returnTo || (mode === 'select' && activeTab === 'drittbeteiligter') ? 'cursor-pointer' : ''}`}
+                                        onDoubleClick={() => handleDoubleClick(item)}
                                     >
-                                        <td
-                                            className="font-semibold"
-                                            onDoubleClick={() => handleDoubleClick(item)}
-                                        >
+                                        <td className="font-semibold">
                                             {item.name}
                                         </td>
                                         <td>{item.typ}</td>
@@ -354,7 +389,6 @@ const Stammdaten: React.FC = () => {
                                     <label className="block text-sm font-semibold text-slate-700 mb-1">Rolle</label>
                                     <input
                                         type="text"
-                                        placeholder="z.B. Zeuge, Sachverständiger"
                                         value={formData.rolle || ''}
                                         onChange={(e) => setFormData({ ...formData, rolle: e.target.value })}
                                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -367,8 +401,7 @@ const Stammdaten: React.FC = () => {
                                 <textarea
                                     value={formData.adresse || ''}
                                     onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                                    rows={2}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px]"
                                 />
                             </div>
 
@@ -382,7 +415,6 @@ const Stammdaten: React.FC = () => {
                                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
-
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
                                     <input
@@ -394,48 +426,79 @@ const Stammdaten: React.FC = () => {
                                 </div>
                             </div>
 
-                            {activeTab !== 'drittbeteiligter' && (
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Bankverbindung</label>
-                                    <textarea
-                                        value={formData.bankverbindung || ''}
-                                        onChange={(e) => setFormData({ ...formData, bankverbindung: e.target.value })}
-                                        rows={2}
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                            )}
-
-                            {activeTab === 'drittbeteiligter' && (
+                            {activeTab === 'drittbeteiligter' ? (
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-1">Notizen</label>
                                     <textarea
                                         value={formData.notizen || ''}
                                         onChange={(e) => setFormData({ ...formData, notizen: e.target.value })}
-                                        rows={3}
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px]"
+                                    />
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Bankverbindung</label>
+                                    <textarea
+                                        value={formData.bankverbindung || ''}
+                                        onChange={(e) => setFormData({ ...formData, bankverbindung: e.target.value })}
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px]"
                                     />
                                 </div>
                             )}
+
+                            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="btn btn-secondary"
+                                >
+                                    Abbrechen
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    className="btn btn-primary"
+                                >
+                                    Speichern
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Role Selection Modal */}
+            {showRoleModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-xl font-bold text-slate-900 mb-4">Rolle festlegen</h3>
+                        <p className="text-slate-600 mb-4">
+                            Bitte geben Sie die Rolle für <strong>{selectedForRole?.name}</strong> in dieser Akte an.
+                        </p>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Rolle (optional)</label>
+                            <input
+                                type="text"
+                                value={roleInput}
+                                onChange={(e) => setRoleInput(e.target.value)}
+                                placeholder="z.B. Zeuge, Gutachter..."
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                autoFocus
+                                onKeyDown={(e) => e.key === 'Enter' && handleRoleSubmit()}
+                            />
                         </div>
 
-                        <div className="flex gap-3 justify-end mt-6">
+                        <div className="flex justify-end gap-3">
                             <button
-                                onClick={() => {
-                                    setShowModal(false);
-                                    setEditingItem(null);
-                                    setFormData({});
-                                }}
+                                onClick={() => setShowRoleModal(false)}
                                 className="btn btn-secondary"
                             >
                                 Abbrechen
                             </button>
                             <button
-                                onClick={handleSave}
-                                className="btn btn-accent"
-                                disabled={!formData.name}
+                                onClick={handleRoleSubmit}
+                                className="btn btn-primary"
                             >
-                                Speichern
+                                Auswählen
                             </button>
                         </div>
                     </div>
@@ -446,37 +509,30 @@ const Stammdaten: React.FC = () => {
             {showDeleteModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Eintrag löschen?</h3>
+                        <h3 className="text-xl font-bold text-slate-900 mb-4">Eintrag löschen</h3>
+                        <p className="text-slate-600 mb-6">
+                            Möchten Sie diesen Eintrag wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+                        </p>
 
-                        {deleteError ? (
-                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+                        {deleteError && (
+                            <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
                                 {deleteError}
                             </div>
-                        ) : (
-                            <p className="text-slate-600 mb-6">
-                                Möchten Sie diesen Eintrag wirklich unwiderruflich löschen?
-                            </p>
                         )}
 
-                        <div className="flex gap-3 justify-end">
+                        <div className="flex justify-end gap-3">
                             <button
-                                onClick={() => {
-                                    setShowDeleteModal(false);
-                                    setItemToDelete(null);
-                                    setDeleteError(null);
-                                }}
+                                onClick={() => setShowDeleteModal(false)}
                                 className="btn btn-secondary"
                             >
-                                {deleteError ? 'Schließen' : 'Abbrechen'}
+                                Abbrechen
                             </button>
-                            {!deleteError && (
-                                <button
-                                    onClick={confirmDelete}
-                                    className="btn bg-red-600 text-white hover:bg-red-700"
-                                >
-                                    Löschen
-                                </button>
-                            )}
+                            <button
+                                onClick={confirmDelete}
+                                className="btn btn-error"
+                            >
+                                Löschen
+                            </button>
                         </div>
                     </div>
                 </div>
