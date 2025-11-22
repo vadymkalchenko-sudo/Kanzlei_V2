@@ -355,7 +355,7 @@ const AktenView: React.FC = () => {
 
         {activeTab === 'fragebogen' && (
           <div className="animate-fadeIn">
-            <Fragebogen />
+            <Fragebogen akteId={id || ''} />
           </div>
         )}
 

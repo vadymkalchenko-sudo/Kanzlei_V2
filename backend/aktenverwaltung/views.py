@@ -517,6 +517,56 @@ class AkteViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    @action(detail=True, methods=["post", "patch"], url_path="update_fragebogen")
+    def update_fragebogen(self, request, pk=None):
+        """
+        Speichert oder aktualisiert Fragebogen-Daten
+        """
+        akte = self.get_object()
+        akte.fragebogen_data = request.data
+        akte.save()
+        
+        return Response(
+            {"status": "Fragebogen gespeichert", "data": akte.fragebogen_data},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=["get"], url_path="export_fragebogen_pdf")
+    def export_fragebogen_pdf_action(self, request, pk=None):
+        """
+        Generiert und liefert Fragebogen-PDF
+        """
+        from .utils.export import export_fragebogen_pdf
+        from .storage import get_akte_directory
+        
+        akte = self.get_object()
+        
+        if not akte.fragebogen_data:
+            return Response(
+                {"detail": "Keine Fragebogen-Daten vorhanden."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Generate PDF
+        export_fragebogen_pdf(akte)
+        
+        # Return file
+        directory = get_akte_directory(akte.aktenzeichen)
+        filepath = directory / "fragebogen.pdf"
+        
+        if filepath.exists():
+            return FileResponse(
+                open(filepath, 'rb'),
+                content_type='application/pdf',
+                filename=f"fragebogen_{akte.aktenzeichen}.pdf"
+            )
+        else:
+            return Response(
+                {"detail": "PDF konnte nicht generiert werden."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 
 class AdressbuchViewSet(ViewSet):
     """

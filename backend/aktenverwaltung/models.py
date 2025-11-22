@@ -92,6 +92,8 @@ class Akte(ZeitstempelModell):
     mandant_historie = models.JSONField(default=dict, blank=True)
     gegner_historie = models.JSONField(default=dict, blank=True)
     drittbeteiligte_historie = models.JSONField(default=dict, blank=True)
+    fragebogen_data = models.JSONField(default=dict, blank=True)
+    fragebogen_historie = models.JSONField(default=dict, blank=True)
 
     dokumenten_pfad_root = models.CharField(max_length=255, blank=True)
     
@@ -111,7 +113,7 @@ class Akte(ZeitstempelModell):
         return self.aktenzeichen
 
     def freeze_stammdaten(self):
-        from .utils.export import export_stammdaten, export_verlauf, export_stammdaten_pdf
+        from .utils.export import export_stammdaten, export_verlauf, export_stammdaten_pdf, export_fragebogen_pdf
         
         self.mandant_historie = {
             "name": self.mandant.name,
@@ -144,10 +146,17 @@ class Akte(ZeitstempelModell):
             })
         self.drittbeteiligte_historie = {"drittbeteiligte": drittbeteiligte_list}
         
+        # Fragebogen Historie
+        self.fragebogen_historie = self.fragebogen_data.copy() if self.fragebogen_data else {}
+        
         # Export to files
         export_stammdaten(self)
         export_verlauf(self)
         export_stammdaten_pdf(self)
+        
+        # Export Fragebogen PDF if data exists
+        if self.fragebogen_data:
+            export_fragebogen_pdf(self)
 
 
 class Dokument(ZeitstempelModell):
