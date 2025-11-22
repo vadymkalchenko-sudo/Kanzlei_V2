@@ -8,15 +8,83 @@ class MandantSerializer(serializers.ModelSerializer):
         model = Mandant
         fields = [
             "id",
-            "name",
-            "adresse",
-            "bankverbindung",
+            "ansprache",
+            "vorname",
+            "nachname",
+            "strasse",
+            "hausnummer",
+            "plz",
+            "stadt",
+            "land",
             "telefon",
             "email",
-            "typ",
+            "bankverbindung",
+            "rechtsschutz",
+            "rechtsschutz_bei",
+            "vst_berechtigt",
+            "notizen",
             "erstellt_am",
             "aktualisiert_am",
         ]
+    
+    def validate_vorname(self, value):
+        """Keine Zahlen oder Sonderzeichen in Vorname/Firmenname"""
+        if value and not all(c.isalpha() or c.isspace() or c in '-' for c in value):
+            raise serializers.ValidationError("Vorname/Firmenname darf nur Buchstaben, Leerzeichen und Bindestriche enthalten.")
+        return value
+    
+    def validate_nachname(self, value):
+        """Keine Zahlen oder Sonderzeichen in Nachname/Ansprechpartner"""
+        if value and not all(c.isalpha() or c.isspace() or c in '-' for c in value):
+            raise serializers.ValidationError("Nachname/Ansprechpartner darf nur Buchstaben, Leerzeichen und Bindestriche enthalten.")
+        return value
+    
+    def validate_plz(self, value):
+        """Nur Zahlen in PLZ"""
+        if value and not value.isdigit():
+            raise serializers.ValidationError("PLZ darf nur Zahlen enthalten.")
+        return value
+    
+    def validate_stadt(self, value):
+        """Keine Sonderzeichen in Stadt"""
+        if value and not all(c.isalnum() or c.isspace() or c in '-' for c in value):
+            raise serializers.ValidationError("Stadt darf nur Buchstaben, Zahlen, Leerzeichen und Bindestriche enthalten.")
+        return value
+    
+    def validate_land(self, value):
+        """Keine Sonderzeichen in Land"""
+        if value and not all(c.isalpha() or c.isspace() or c in '-' for c in value):
+            raise serializers.ValidationError("Land darf nur Buchstaben, Leerzeichen und Bindestriche enthalten.")
+        return value
+    
+    def validate_telefon(self, value):
+        """Keine Buchstaben in Telefon"""
+        if value and not all(c.isdigit() or c in ' +-/()' for c in value):
+            raise serializers.ValidationError("Telefon darf nur Zahlen und die Zeichen + - / ( ) enthalten.")
+        return value
+    
+    def validate_bankverbindung(self, value):
+        """Keine Sonderzeichen in Bankverbindung (außer Leerzeichen und Bindestriche)"""
+        if value and not all(c.isalnum() or c.isspace() or c in '-/' for c in value):
+            raise serializers.ValidationError("Bankverbindung darf nur Buchstaben, Zahlen, Leerzeichen, Bindestriche und Schrägstriche enthalten.")
+        return value
+    
+    def validate(self, data):
+        """Bedingte Pflichtfelder: Vorname und Nachname sind Pflicht bei Herr/Frau"""
+        ansprache = data.get('ansprache')
+        vorname = data.get('vorname', '').strip()
+        nachname = data.get('nachname', '').strip()
+        
+        if ansprache in ['Herr', 'Frau']:
+            if not vorname:
+                raise serializers.ValidationError({"vorname": "Vorname ist Pflichtfeld bei Herr/Frau."})
+            if not nachname:
+                raise serializers.ValidationError({"nachname": "Nachname ist Pflichtfeld bei Herr/Frau."})
+        elif ansprache == 'Firma':
+            if not vorname:
+                raise serializers.ValidationError({"vorname": "Firmenname ist Pflichtfeld."})
+        
+        return data
 
 
 class GegnerSerializer(serializers.ModelSerializer):
@@ -25,8 +93,11 @@ class GegnerSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "adresse",
-            "bankverbindung",
+            "strasse",
+            "hausnummer",
+            "plz",
+            "stadt",
+            "land",
             "telefon",
             "email",
             "typ",

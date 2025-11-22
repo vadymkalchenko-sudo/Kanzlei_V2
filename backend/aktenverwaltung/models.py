@@ -12,6 +12,12 @@ class ZeitstempelModell(models.Model):
         abstract = True
 
 
+ANSPRACHE_CHOICES = (
+    ("Herr", "Herr"),
+    ("Frau", "Frau"),
+    ("Firma", "Firma"),
+)
+
 TYP_CHOICES = (
     ("Person", "Person"),
     ("Firma", "Firma"),
@@ -20,24 +26,53 @@ TYP_CHOICES = (
 
 
 class Mandant(ZeitstempelModell):
-    name = models.CharField(max_length=255)
-    adresse = models.TextField(blank=True)
-    bankverbindung = models.TextField(blank=True)
+    # Ansprache und Name
+    ansprache = models.CharField(max_length=20, choices=ANSPRACHE_CHOICES, default="Herr")
+    vorname = models.CharField(max_length=100, blank=True)  # Bei Firma: Firmenname
+    nachname = models.CharField(max_length=100, blank=True)  # Bei Firma: Ansprechpartner
+    
+    # Strukturierte Adresse
+    strasse = models.CharField(max_length=255, blank=True)
+    hausnummer = models.CharField(max_length=20, blank=True)
+    plz = models.CharField(max_length=10, blank=True)
+    stadt = models.CharField(max_length=100, blank=True)
+    land = models.CharField(max_length=100, default="Deutschland", blank=True)
+    
+    # Kontaktdaten
     telefon = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
-    typ = models.CharField(max_length=20, choices=TYP_CHOICES, default="Person")
+    
+    # Bankverbindung
+    bankverbindung = models.TextField(blank=True)
+    
+    # Rechtsschutz und VST
+    rechtsschutz = models.BooleanField(default=False)
+    rechtsschutz_bei = models.CharField(max_length=255, blank=True)
+    vst_berechtigt = models.BooleanField(default=False)
+    
+    # Notizen
+    notizen = models.TextField(blank=True)
 
     def __str__(self):
-        return self.name
+        if self.ansprache == "Firma":
+            return self.vorname if self.vorname else "Unbenannte Firma"
+        else:
+            return f"{self.vorname} {self.nachname}".strip() if self.vorname or self.nachname else "Unbenannter Mandant"
 
 
 class Gegner(ZeitstempelModell):
     name = models.CharField(max_length=255)
-    adresse = models.TextField(blank=True)
-    bankverbindung = models.TextField(blank=True)
+    strasse = models.CharField(max_length=255, blank=True)
+    hausnummer = models.CharField(max_length=20, blank=True)
+    plz = models.CharField(max_length=10, blank=True)
+    stadt = models.CharField(max_length=100, blank=True)
+    land = models.CharField(max_length=100, default="Deutschland")
     telefon = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
-    typ = models.CharField(max_length=20, choices=TYP_CHOICES, default="Person")
+    typ = models.CharField(max_length=20, choices=TYP_CHOICES, default="Versicherung")
+
+    class Meta:
+        verbose_name_plural = "Gegner"
 
     def __str__(self):
         return self.name
@@ -116,8 +151,8 @@ class Akte(ZeitstempelModell):
         from .utils.export import export_stammdaten, export_verlauf, export_stammdaten_pdf, export_fragebogen_pdf
         
         self.mandant_historie = {
-            "name": self.mandant.name,
-            "adresse": self.mandant.adresse,
+            "name": str(self.mandant),
+            "adresse": f"{self.mandant.strasse} {self.mandant.hausnummer}, {self.mandant.plz} {self.mandant.stadt}",
             "bankverbindung": self.mandant.bankverbindung,
             "telefon": self.mandant.telefon,
             "email": self.mandant.email,
@@ -125,8 +160,8 @@ class Akte(ZeitstempelModell):
         }
         self.gegner_historie = {
             "name": self.gegner.name,
-            "adresse": self.gegner.adresse,
-            "bankverbindung": self.gegner.bankverbindung,
+            "adresse": f"{self.gegner.strasse} {self.gegner.hausnummer}, {self.gegner.plz} {self.gegner.stadt}",
+            "bankverbindung": "", # Gegner has no bankverbindung anymore
             "telefon": self.gegner.telefon,
             "email": self.gegner.email,
             "typ": self.gegner.typ,

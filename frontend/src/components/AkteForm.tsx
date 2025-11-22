@@ -11,24 +11,37 @@ const AkteForm: React.FC = () => {
   const [mandantId, setMandantId] = useState<number | null>(null);
   const [gegnerId, setGegnerId] = useState<number | null>(null);
 
-  // Restore nested structure to prevent crash
+  // Form Data State
   const [formData, setFormData] = useState({
+    aktenzeichen: '',
+    titel: '',
+    beschreibung: '',
+    status: 'Offen',
     mandant: {
-      name: '',
-      adresse: '',
+      ansprache: 'Herr',
+      vorname: '',
+      nachname: '',
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      stadt: '',
+      land: 'Deutschland',
       telefon: '',
       email: '',
       typ: 'Person'
     },
     gegner: {
       name: '',
-      adresse: '',
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      stadt: '',
+      land: 'Deutschland',
       telefon: '',
       email: '',
-      typ: 'Person'
+      typ: 'Versicherung'
     },
-    aktenzeichen: '',
-    status: 'Offen'
+    drittbeteiligte: [] as any[]
   });
 
   // Load selected Mandant/Gegner IDs from localStorage and fetch their data
@@ -40,36 +53,34 @@ const AkteForm: React.FC = () => {
       const id = parseInt(selectedMandantId);
       setMandantId(id);
       fetchMandantData(id);
-      // localStorage.removeItem('selectedMandantId'); // Keep it to be safe against StrictMode
     }
 
     if (selectedGegnerId) {
       const id = parseInt(selectedGegnerId);
       setGegnerId(id);
       fetchGegnerData(id);
-      // localStorage.removeItem('selectedGegnerId'); // Keep it to be safe against StrictMode
     }
   }, []);
 
   const fetchMandantData = async (id: number) => {
     try {
       const response = await api.get(`mandanten/${id}/`);
-      // setMandantData(response.data); // This is redundant with setFormData but kept for clarity if we need raw data later
-
-      // Pre-fill form data
-      setFormData(prev => {
-        const newData = {
-          ...prev,
-          mandant: {
-            name: response.data.name || '',
-            adresse: response.data.adresse || '',
-            telefon: response.data.telefon || '',
-            email: response.data.email || '',
-            typ: response.data.typ || 'Person'
-          }
-        };
-        return newData;
-      });
+      setFormData(prev => ({
+        ...prev,
+        mandant: {
+          ansprache: response.data.ansprache || 'Herr',
+          vorname: response.data.vorname || '',
+          nachname: response.data.nachname || '',
+          strasse: response.data.strasse || '',
+          hausnummer: response.data.hausnummer || '',
+          plz: response.data.plz || '',
+          stadt: response.data.stadt || '',
+          land: response.data.land || 'Deutschland',
+          telefon: response.data.telefon || '',
+          email: response.data.email || '',
+          typ: response.data.typ || 'Person'
+        }
+      }));
     } catch (err) {
       console.error('Error fetching Mandant data:', err);
     }
@@ -78,17 +89,18 @@ const AkteForm: React.FC = () => {
   const fetchGegnerData = async (id: number) => {
     try {
       const response = await api.get(`gegner/${id}/`);
-      // setGegnerData(response.data); // This is redundant with setFormData but kept for clarity if we need raw data later
-
-      // Pre-fill form data
       setFormData(prev => ({
         ...prev,
         gegner: {
           name: response.data.name || '',
-          adresse: response.data.adresse || '',
+          strasse: response.data.strasse || '',
+          hausnummer: response.data.hausnummer || '',
+          plz: response.data.plz || '',
+          stadt: response.data.stadt || '',
+          land: response.data.land || 'Deutschland',
           telefon: response.data.telefon || '',
           email: response.data.email || '',
-          typ: response.data.typ || 'Person'
+          typ: response.data.typ || 'Versicherung'
         }
       }));
     } catch (err) {
@@ -96,13 +108,9 @@ const AkteForm: React.FC = () => {
     }
   };
 
-
-
   const handleMandantChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    // If user changes data, we assume it's a new entry or update, so we clear the ID to force creation/check
-    // Ideally we would support updating, but for now we treat it as new to avoid overwriting wrong IDs
-    setMandantId(null);
+    setMandantId(null); // Clear ID on manual change
     setFormData(prev => ({
       ...prev,
       mandant: { ...prev.mandant, [name]: value }
@@ -111,30 +119,18 @@ const AkteForm: React.FC = () => {
 
   const handleGegnerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setGegnerId(null);
+    setGegnerId(null); // Clear ID on manual change
     setFormData(prev => ({
       ...prev,
       gegner: { ...prev.gegner, [name]: value }
     }));
   };
 
-  const handleCancel = () => {
-    localStorage.removeItem('selectedMandantId');
-    localStorage.removeItem('selectedGegnerId');
-    navigate('/dashboard');
-  };
-
-  const handleReset = () => {
-    localStorage.removeItem('selectedMandantId');
-    localStorage.removeItem('selectedGegnerId');
-    setMandantId(null);
-    setGegnerId(null);
-    setFormData({
-      mandant: { name: '', adresse: '', telefon: '', email: '', typ: 'Person' },
-      gegner: { name: '', adresse: '', telefon: '', email: '', typ: 'Person' },
-      aktenzeichen: '',
-      status: 'Offen'
-    });
+  const handleSelectFromStammdaten = (type: 'mandant' | 'gegner') => {
+    // Save current form state to localStorage to restore it later if needed
+    // For now, we just navigate to Stammdaten with returnTo param
+    const returnUrl = window.location.pathname;
+    window.location.href = `/stammdaten?tab=${type}&returnTo=${encodeURIComponent(returnUrl)}`;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -142,44 +138,42 @@ const AkteForm: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Validate that we have at least a Mandant name
-    if (!formData.mandant.name) {
-      setError('Bitte geben Sie einen Mandanten an.');
+    // Validation
+    if (!formData.mandant.vorname && !formData.mandant.nachname) {
+      setError('Bitte geben Sie einen Namen für den Mandanten an.');
       setLoading(false);
       return;
     }
 
     try {
-      // Construct payload
-      // If we have an ID, send it. If not, send the object data (which backend will reject if we only allow IDs!)
-      // WAIT! The backend NOW expects IDs for 'mandant' and 'gegner'.
-      // If we don't have an ID (manual entry), we must CREATE the Mandant/Gegner first?
-      // OR we update the serializer to accept nested objects for creation too?
-
-      // The serializer change I made:
-      // mandant = serializers.PrimaryKeyRelatedField(queryset=Mandant.objects.all(), write_only=True)
-      // This means it ONLY accepts IDs!
-
-      // So if manual entry, we MUST create Mandant/Gegner first via API, get ID, then create Akte.
-      // This is a breaking change for manual entry!
-
-      // I need to handle manual entry here.
-
       let finalMandantId = mandantId;
       let finalGegnerId = gegnerId;
 
-      // 1. Handle Mandant
+      // 1. Handle Mandant (Create if no ID)
       if (!finalMandantId) {
-        // Create new Mandant
         const mandantResponse = await api.post(`mandanten/`, formData.mandant);
         finalMandantId = mandantResponse.data.id;
       }
 
-      // 2. Handle Gegner
+      // 2. Handle Gegner (Create if no ID)
       if (!finalGegnerId && formData.gegner.name) {
-        // Create new Gegner
-        const gegnerResponse = await api.post(`gegner/`, formData.gegner);
-        finalGegnerId = gegnerResponse.data.id;
+        // First check if a Gegner with this name already exists
+        try {
+          const searchRes = await api.get(`gegner/search/?q=${encodeURIComponent(formData.gegner.name)}`);
+          const existingGegner = searchRes.data.find((g: any) => g.name.toLowerCase() === formData.gegner.name.toLowerCase());
+
+          if (existingGegner) {
+            finalGegnerId = existingGegner.id;
+          } else {
+            const gegnerResponse = await api.post(`gegner/`, formData.gegner);
+            finalGegnerId = gegnerResponse.data.id;
+          }
+        } catch (err) {
+          // If search fails, proceed with creation attempt or handle error
+          console.error("Error searching for existing Gegner:", err);
+          const gegnerResponse = await api.post(`gegner/`, formData.gegner);
+          finalGegnerId = gegnerResponse.data.id;
+        }
       }
 
       const payload = {
@@ -247,7 +241,7 @@ const AkteForm: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate('/stammdaten?tab=mandant&returnTo=/akte')}
+                  onClick={() => navigate('/stammdaten?tab=mandant&returnTo=/akten/neu')}
                   className="btn btn-secondary text-sm"
                 >
                   Stammdaten
@@ -255,52 +249,117 @@ const AkteForm: React.FC = () => {
               </div>
 
               <div className="space-y-5">
+                {/* Ansprache */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Typ <span className="text-red-500">*</span>
+                    Ansprache <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="typ"
-                    value={formData.mandant?.typ || 'Person'}
-                    onChange={handleMandantChange}
-                    className="input"
-                    required
-                  >
-                    <option value="Person">Natürliche Person</option>
-                    <option value="Unternehmen">Unternehmen</option>
-                    <option value="Versicherung">Versicherung</option>
-                  </select>
+                  <div className="flex gap-4">
+                    {['Herr', 'Frau', 'Firma'].map((option) => (
+                      <label key={option} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="ansprache"
+                          value={option}
+                          checked={formData.mandant.ansprache === option}
+                          onChange={handleMandantChange}
+                          className="text-primary focus:ring-primary"
+                        />
+                        <span className="text-sm text-slate-700">{option}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Name Fields */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      {formData.mandant.ansprache === 'Firma' ? 'Firmenname' : 'Vorname'} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="vorname"
+                      value={formData.mandant.vorname}
+                      onChange={handleMandantChange}
+                      className="input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      {formData.mandant.ansprache === 'Firma' ? 'Ansprechpartner' : 'Nachname'} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="nachname"
+                      value={formData.mandant.nachname}
+                      onChange={handleMandantChange}
+                      className="input"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Address Fields */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Straße</label>
+                    <input
+                      type="text"
+                      name="strasse"
+                      value={formData.mandant.strasse}
+                      onChange={handleMandantChange}
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Nr.</label>
+                    <input
+                      type="text"
+                      name="hausnummer"
+                      value={formData.mandant.hausnummer}
+                      onChange={handleMandantChange}
+                      className="input"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">PLZ</label>
+                    <input
+                      type="text"
+                      name="plz"
+                      value={formData.mandant.plz}
+                      onChange={handleMandantChange}
+                      className="input"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Stadt</label>
+                    <input
+                      type="text"
+                      name="stadt"
+                      value={formData.mandant.stadt}
+                      onChange={handleMandantChange}
+                      className="input"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Name / Firma <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Land</label>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.mandant?.name || ''}
+                    name="land"
+                    value={formData.mandant.land}
                     onChange={handleMandantChange}
                     className="input"
-                    required
-                    placeholder="z.B. Max Mustermann"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Adresse
-                  </label>
-                  <input
-                    type="text"
-                    name="adresse"
-                    value={formData.mandant?.adresse || ''}
-                    onChange={handleMandantChange}
-                    className="input"
-                    placeholder="Straße, PLZ, Ort"
-                  />
-                </div>
-
+                {/* Contact Fields */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -309,7 +368,7 @@ const AkteForm: React.FC = () => {
                     <input
                       type="tel"
                       name="telefon"
-                      value={formData.mandant?.telefon || ''}
+                      value={formData.mandant.telefon}
                       onChange={handleMandantChange}
                       className="input"
                       placeholder="+49 123 456789"
@@ -323,7 +382,7 @@ const AkteForm: React.FC = () => {
                     <input
                       type="email"
                       name="email"
-                      value={formData.mandant?.email || ''}
+                      value={formData.mandant.email}
                       onChange={handleMandantChange}
                       className="input"
                       placeholder="email@example.com"
@@ -347,7 +406,7 @@ const AkteForm: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate('/stammdaten?tab=gegner&returnTo=/akte')}
+                  onClick={() => navigate('/stammdaten?tab=gegner&returnTo=/akten/neu')}
                   className="btn btn-secondary text-sm"
                 >
                   Stammdaten
@@ -355,79 +414,118 @@ const AkteForm: React.FC = () => {
               </div>
 
               <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Typ <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="typ"
-                    value={formData.gegner?.typ || 'Person'}
-                    onChange={handleGegnerChange}
-                    className="input bg-white"
-                    required
-                  >
-                    <option value="Person">Natürliche Person</option>
-                    <option value="Unternehmen">Unternehmen</option>
-                    <option value="Versicherung">Versicherung</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Name / Firma <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.gegner?.name || ''}
-                    onChange={handleGegnerChange}
-                    className="input bg-white"
-                    required
-                    placeholder="z.B. Gegner GmbH"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Adresse
-                  </label>
-                  <input
-                    type="text"
-                    name="adresse"
-                    value={formData.gegner?.adresse || ''}
-                    onChange={handleGegnerChange}
-                    className="input bg-white"
-                    placeholder="Straße, PLZ, Ort"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Telefon
-                    </label>
-                    <input
-                      type="tel"
-                      name="telefon"
-                      value={formData.gegner?.telefon || ''}
-                      onChange={handleGegnerChange}
-                      className="input bg-white"
-                      placeholder="+49 987 654321"
-                    />
+                {/* New Gegner fields */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-slate-900">Gegner (Versicherung)</h2>
                   </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Name / Versicherung</label>
+                      <input
+                        type="text"
+                        value={formData.gegner.name}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          gegner: { ...formData.gegner, name: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="Name der Versicherung"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      E-Mail
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.gegner?.email || ''}
-                      onChange={handleGegnerChange}
-                      className="input bg-white"
-                      placeholder="email@gegner.de"
-                    />
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Straße</label>
+                        <input
+                          type="text"
+                          value={formData.gegner.strasse || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            gegner: { ...formData.gegner, strasse: e.target.value }
+                          })}
+                          className="input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nr.</label>
+                        <input
+                          type="text"
+                          value={formData.gegner.hausnummer || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            gegner: { ...formData.gegner, hausnummer: e.target.value }
+                          })}
+                          className="input"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">PLZ</label>
+                        <input
+                          type="text"
+                          value={formData.gegner.plz || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            gegner: { ...formData.gegner, plz: e.target.value }
+                          })}
+                          className="input"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Stadt</label>
+                        <input
+                          type="text"
+                          value={formData.gegner.stadt || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            gegner: { ...formData.gegner, stadt: e.target.value }
+                          })}
+                          className="input"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Land</label>
+                      <input
+                        type="text"
+                        value={formData.gegner.land || 'Deutschland'}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          gegner: { ...formData.gegner, land: e.target.value }
+                        })}
+                        className="input"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
+                        <input
+                          type="text"
+                          value={formData.gegner.telefon}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            gegner: { ...formData.gegner, telefon: e.target.value }
+                          })}
+                          className="input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                        <input
+                          type="email"
+                          value={formData.gegner.email}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            gegner: { ...formData.gegner, email: e.target.value }
+                          })}
+                          className="input"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

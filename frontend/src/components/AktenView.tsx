@@ -13,6 +13,7 @@ interface Mandant {
   adresse: string;
   telefon: string;
   email: string;
+  // Add raw fields if needed for other logic, but for display we construct strings
 }
 
 interface Gegner {
@@ -75,22 +76,44 @@ const AktenView: React.FC = () => {
         const response = await api.get(`akten/${id}/`);
         const data = response.data;
 
+        // Helper to construct Mandant Name
+        const getMandantName = (m: any) => {
+          if (!m) return 'Unbekannt';
+          if (m.ansprache === 'Firma') return m.vorname || 'Unbenannte Firma';
+          return `${m.vorname} ${m.nachname}`.trim() || 'Unbenannter Mandant';
+        };
+
+        // Helper to construct Address
+        const getAddress = (obj: any) => {
+          if (!obj) return '';
+          const parts = [
+            `${obj.strasse || ''} ${obj.hausnummer || ''}`.trim(),
+            `${obj.plz || ''} ${obj.stadt || ''}`.trim()
+          ].filter(part => part !== '');
+          return parts.join(', ');
+        };
+
+        const mandantName = getMandantName(data.mandant);
+        const gegnerName = data.gegner?.name || 'Unbekannt';
+
         const mappedAkte: Akte = {
           id: data.id,
           az: data.aktenzeichen,
-          betreff: `${data.mandant?.name || 'Unbekannt'} ./. ${data.gegner?.name || 'Unbekannt'}`,
+          betreff: `${mandantName} ./. ${gegnerName}`,
           status: data.status,
           anlagedatum: new Date(data.erstellt_am).toLocaleDateString('de-DE'),
           modus_operandi: data.modus_operandi || "",
           mandant: {
-            name: data.mandant?.name || '',
-            adresse: data.mandant?.adresse || '',
+            id: data.mandant?.id,
+            name: mandantName,
+            adresse: getAddress(data.mandant),
             telefon: data.mandant?.telefon || '',
             email: data.mandant?.email || ''
           },
           gegner: {
-            name: data.gegner?.name || '',
-            adresse: data.gegner?.adresse || '',
+            id: data.gegner?.id,
+            name: gegnerName,
+            adresse: getAddress(data.gegner),
             telefon: data.gegner?.telefon || '',
             email: data.gegner?.email || '',
             vertreter: ''
@@ -264,108 +287,110 @@ const AktenView: React.FC = () => {
 
       {/* Tab Content */}
       <div className="min-h-[500px]">
-        {activeTab === 'akte' && (
-          <div className="space-y-8 animate-fadeIn">
-            {/* Stammdaten Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Mandant Card */}
-              <div className="card">
-                <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
-                  <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
-                    <UserIcon /> Mandant
-                  </h3>
-                  <button className="text-sm text-primary hover:underline">Bearbeiten</button>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-text-muted">Name:</span>
-                    <span className="col-span-2 font-medium">{akte.mandant.name}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-text-muted">Adresse:</span>
-                    <span className="col-span-2">{akte.mandant.adresse}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-text-muted">Kontakt:</span>
-                    <div className="col-span-2 flex flex-col">
-                      <a href={`tel:${akte.mandant.telefon}`} className="text-primary hover:underline">{akte.mandant.telefon}</a>
-                      <a href={`mailto:${akte.mandant.email}`} className="text-primary hover:underline">{akte.mandant.email}</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gegner Card */}
-              <div className="card">
-                <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
-                  <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
-                    <ShieldIcon /> Gegner
-                  </h3>
-                  <button className="text-sm text-primary hover:underline">Bearbeiten</button>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-text-muted">Name:</span>
-                    <span className="col-span-2 font-medium">{akte.gegner.name}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-text-muted">Vertreter:</span>
-                    <span className="col-span-2">{akte.gegner.vertreter}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-text-muted">Adresse:</span>
-                    <span className="col-span-2">{akte.gegner.adresse}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-text-muted">Kontakt:</span>
-                    <div className="col-span-2 flex flex-col">
-                      <a href={`tel:${akte.gegner.telefon}`} className="text-primary hover:underline">{akte.gegner.telefon}</a>
-                      <a href={`mailto:${akte.gegner.email}`} className="text-primary hover:underline">{akte.gegner.email}</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content Split View */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {/* Left Column: Verlauf (2/3 width on large screens) */}
-              <div className="xl:col-span-2">
-                <div className="card h-full">
-                  <VerlaufSection akteId={id || ''} />
-                </div>
-              </div>
-
-              {/* Right Column: Aufgaben/Fristen (1/3 width) */}
-              <div className="xl:col-span-1">
-                <div className="card h-full sticky top-6">
-                  <h3 className="text-lg font-bold text-secondary mb-4">Aufgaben & Fristen</h3>
-                  <AufgabenFristenSection akteId={id || ''} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'drittbeteiligte' && (
-          <div className="animate-fadeIn">
-            <DrittbeteiligteList akteId={id || ''} />
-          </div>
-        )}
-
-        {activeTab === 'fragebogen' && (
-          <div className="animate-fadeIn">
-            <Fragebogen akteId={id || ''} />
-          </div>
-        )}
-
-        {activeTab === 'finanzen' && (
-          <div className="animate-fadeIn">
+        <div className={activeTab === 'akte' ? 'space-y-8 animate-fadeIn' : 'hidden'}>
+          {/* Stammdaten Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Mandant Card */}
             <div className="card">
-              <FinanzTabelle akteId={id || ''} />
+              <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+                <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
+                  <UserIcon /> Mandant
+                </h3>
+                <button
+                  onClick={() => navigate(`/stammdaten?tab=mandant&editId=${akte.mandant.id}&returnTo=/akten/${id}`)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Bearbeiten
+                </button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-text-muted">Name:</span>
+                  <span className="col-span-2 font-medium">{akte.mandant.name}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-text-muted">Adresse:</span>
+                  <span className="col-span-2">{akte.mandant.adresse}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-text-muted">Kontakt:</span>
+                  <div className="col-span-2 flex flex-col">
+                    <a href={`tel:${akte.mandant.telefon}`} className="text-primary hover:underline">{akte.mandant.telefon}</a>
+                    <a href={`mailto:${akte.mandant.email}`} className="text-primary hover:underline">{akte.mandant.email}</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Gegner Card */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+                <h3 className="text-lg font-bold text-secondary flex items-center gap-2">
+                  <ShieldIcon /> Gegner
+                </h3>
+                <button
+                  onClick={() => navigate(`/stammdaten?tab=gegner&editId=${akte.gegner.id}&returnTo=/akten/${id}`)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Bearbeiten
+                </button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-text-muted">Name:</span>
+                  <span className="col-span-2 font-medium">{akte.gegner.name}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-text-muted">Vertreter:</span>
+                  <span className="col-span-2">{akte.gegner.vertreter}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-text-muted">Adresse:</span>
+                  <span className="col-span-2">{akte.gegner.adresse}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-text-muted">Kontakt:</span>
+                  <div className="col-span-2 flex flex-col">
+                    <a href={`tel:${akte.gegner.telefon}`} className="text-primary hover:underline">{akte.gegner.telefon}</a>
+                    <a href={`mailto:${akte.gegner.email}`} className="text-primary hover:underline">{akte.gegner.email}</a>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        )}
+
+          {/* Main Content Split View */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Left Column: Verlauf (2/3 width on large screens) */}
+            <div className="xl:col-span-2">
+              <div className="card h-full">
+                <VerlaufSection akteId={id || ''} />
+              </div>
+            </div>
+
+            {/* Right Column: Aufgaben/Fristen (1/3 width) */}
+            <div className="xl:col-span-1">
+              <div className="card h-full sticky top-6">
+                <h3 className="text-lg font-bold text-secondary mb-4">Aufgaben & Fristen</h3>
+                <AufgabenFristenSection akteId={id || ''} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={activeTab === 'drittbeteiligte' ? 'animate-fadeIn' : 'hidden'}>
+          <DrittbeteiligteList akteId={id || ''} />
+        </div>
+
+        <div className={activeTab === 'fragebogen' ? 'animate-fadeIn' : 'hidden'}>
+          <Fragebogen akteId={id || ''} />
+        </div>
+
+        <div className={activeTab === 'finanzen' ? 'animate-fadeIn' : 'hidden'}>
+          <div className="card">
+            <FinanzTabelle akteId={id || ''} />
+          </div>
+        </div>
       </div>
     </div>
   );

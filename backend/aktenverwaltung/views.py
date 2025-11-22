@@ -348,7 +348,7 @@ class AkteViewSet(viewsets.ModelViewSet):
             return False
 
         # mandant_obj is now a Mandant instance, not a dict
-        mandant_name = mandant_obj.name
+        mandant_name = str(mandant_obj)
         return Akte.objects.filter(status="Offen", gegner__name=mandant_name).exists()
 
     @action(detail=True, methods=["get"], url_path="organizer")

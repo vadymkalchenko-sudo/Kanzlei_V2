@@ -1,34 +1,48 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
+
+type BeteiligterTyp = 'mandant' | 'gegner' | 'drittbeteiligter';
 
 interface Beteiligter {
     id: number;
-    name: string;
-    adresse: string;
+    // Mandant-specific fields
+    ansprache?: string;
+    vorname?: string;
+    nachname?: string;
+    // Gegner-specific fields (now similar to Mandant address)
+    strasse?: string;
+    hausnummer?: string;
+    plz?: string;
+    stadt?: string;
+    land?: string;
+
+    rechtsschutz?: boolean;
+    rechtsschutz_bei?: string;
+    vst_berechtigt?: boolean;
+    notizen?: string;
+
+    // Common fields
+    name?: string; // Used for Gegner name / Mandant full name display
     telefon: string;
     email: string;
     typ: string;
     rolle?: string;
-    notizen?: string;
-    bankverbindung?: string;
+    bankverbindung?: string; // Only for Mandant now (if needed) or legacy
+    adresse?: string; // Legacy field for Drittbeteiligter or fallback
 }
 
-type BeteiligterTyp = 'mandant' | 'gegner' | 'drittbeteiligter';
-
 const Stammdaten: React.FC = () => {
+    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState<BeteiligterTyp>('mandant');
+    const [searchQuery, setSearchQuery] = useState('');
     const [mandanten, setMandanten] = useState<Beteiligter[]>([]);
     const [gegner, setGegner] = useState<Beteiligter[]>([]);
     const [drittbeteiligte, setDrittbeteiligte] = useState<Beteiligter[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    // Initialize activeTab from URL parameter
-    const [activeTab, setActiveTab] = useState<BeteiligterTyp>(
-        (searchParams.get('tab') as BeteiligterTyp) || 'mandant'
-    );
-
+    // Modal State
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState<Beteiligter | null>(null);
     const [formData, setFormData] = useState<Partial<Beteiligter>>({});
@@ -50,9 +64,26 @@ const Stammdaten: React.FC = () => {
         }
     }, [tabParam]);
 
+    const editId = searchParams.get('editId');
+
     useEffect(() => {
         fetchAll();
     }, []);
+
+    useEffect(() => {
+        if (editId && !loading) {
+            const id = parseInt(editId);
+            let item: Beteiligter | undefined;
+
+            if (activeTab === 'mandant') item = mandanten.find(m => m.id === id);
+            else if (activeTab === 'gegner') item = gegner.find(g => g.id === id);
+            else if (activeTab === 'drittbeteiligter') item = drittbeteiligte.find(d => d.id === id);
+
+            if (item) {
+                handleEdit(item);
+            }
+        }
+    }, [editId, loading, mandanten, gegner, drittbeteiligte, activeTab]);
 
     const fetchAll = async () => {
         try {
@@ -154,6 +185,12 @@ const Stammdaten: React.FC = () => {
             setShowModal(false);
             setEditingItem(null);
             setFormData({});
+
+            if (returnTo) {
+                window.location.href = returnTo;
+                return;
+            }
+
             fetchAll();
         } catch (error) {
             console.error('Fehler beim Speichern:', error);
@@ -169,336 +206,456 @@ const Stammdaten: React.FC = () => {
         }
     };
 
-    const getTabLabel = (typ: BeteiligterTyp) => {
-        switch (typ) {
-            case 'mandant': return 'Mandanten';
-            case 'gegner': return 'Gegner';
-            case 'drittbeteiligter': return 'Drittbeteiligte';
-        }
-    };
-
     const handleDoubleClick = (item: Beteiligter) => {
-        console.log("Double Click:", item.name, "Mode:", mode, "ActiveTab:", activeTab);
-
-        // Handle selection mode for Drittbeteiligte
-        if (mode === 'select' && activeTab === 'drittbeteiligter') {
-            setSelectedForRole(item);
-            setRoleInput('');
-            setShowRoleModal(true);
-            return;
-        }
-
-        // Original logic for Mandant/Gegner
+        // If we are in selection mode (returnTo is present), select and return
         if (returnTo) {
-            // Selection mode for Mandant/Gegner (New Akte flow)
             if (activeTab === 'mandant') {
                 localStorage.setItem('selectedMandantId', item.id.toString());
             } else if (activeTab === 'gegner') {
                 localStorage.setItem('selectedGegnerId', item.id.toString());
             }
-
-            // Force full page reload to trigger useEffect in AkteForm
-            setTimeout(() => {
-                window.location.href = returnTo;
-            }, 200);
-        } else if (!mode) {
-            // Edit mode (only if not in selection mode)
+            // Navigate back
+            navigate(returnTo);
+        } else {
+            // Otherwise open edit modal
             handleEdit(item);
         }
     };
 
-    const handleRoleSubmit = () => {
-        if (!selectedForRole) return;
-
-        // Store selection in localStorage
-        localStorage.setItem('selected_drittbeteiligter_id', selectedForRole.id.toString());
-        if (roleInput) {
-            localStorage.setItem('selected_drittbeteiligter_rolle', roleInput);
-        }
-
-        // Navigate back to Akte
-        const akteId = localStorage.getItem('return_to_akte_id');
-        if (akteId) {
-            localStorage.removeItem('return_to_akte_id');
-            window.location.href = `/akte/${akteId}?tab=drittbeteiligte`;
-        }
-        setShowRoleModal(false);
-    };
-
     return (
-        <div className="space-y-6">
-            {/* Selection Mode Banner */}
-            {(returnTo || (mode === 'select' && activeTab === 'drittbeteiligter')) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-800 font-semibold">
-                        {activeTab === 'drittbeteiligter'
-                            ? "Auswahl-Modus: Doppelklicken Sie auf einen Drittbeteiligten, um ihn auszuwählen"
-                            : `Auswahl-Modus: Doppelklicken Sie auf den Namen eines ${activeTab === 'mandant' ? 'Mandanten' : 'Gegners'}, um ihn auszuwählen`
-                        }
-                    </p>
-                </div>
-            )}
-
+        <div className="h-full flex flex-col bg-slate-50">
             {/* Header */}
-            <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">Stammdaten-Verwaltung</h2>
-
-                {/* Search Bar */}
-                <div className="flex gap-3">
-                    <input
-                        type="text"
-                        placeholder="Suche nach Name, Email, Telefon..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                        className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <button onClick={handleSearch} className="btn btn-secondary">
-                        Suchen
-                    </button>
+            <div className="bg-white border-b border-slate-200 px-8 py-6">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Stammdaten</h1>
+                        <p className="text-slate-500">Verwaltung von Mandanten, Gegnern und Drittbeteiligten</p>
+                    </div>
                     <button
                         onClick={() => {
                             setEditingItem(null);
-                            setFormData({ typ: 'Person' });
+                            setFormData(activeTab === 'mandant' ? { ansprache: 'Herr', land: 'Deutschland' } : { land: 'Deutschland', typ: 'Versicherung' });
                             setShowModal(true);
                         }}
-                        className="btn btn-accent"
+                        className="btn btn-primary"
                     >
-                        + Neu anlegen
+                        <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Neu anlegen
                     </button>
                 </div>
-            </div>
 
-            {/* Tabs */}
-            <div className="border-b border-border">
-                <div className="flex gap-4">
-                    {(['mandant', 'gegner', 'drittbeteiligter'] as BeteiligterTyp[]).map((typ) => (
+                {/* Tabs */}
+                <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+                    {(['mandant', 'gegner', 'drittbeteiligter'] as const).map((tab) => (
                         <button
-                            key={typ}
-                            onClick={() => setActiveTab(typ)}
-                            className={`px-4 py-3 font-semibold border-b-2 transition-colors ${activeTab === typ
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-slate-600 hover:text-slate-900'
+                            key={tab}
+                            onClick={() => {
+                                setActiveTab(tab);
+                                // Update URL without reloading
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('tab', tab);
+                                window.history.pushState({}, '', url);
+                            }}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                                 }`}
                         >
-                            {getTabLabel(typ)}
+                            {tab.charAt(0).toUpperCase() + tab.slice(1)}en
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="card">
-                <div className="table-container">
-                    <table className="table">
-                        <thead>
+            {/* Search & Content */}
+            <div className="flex-1 p-8 overflow-hidden flex flex-col">
+                <div className="mb-6">
+                    <div className="relative max-w-md">
+                        <input
+                            type="text"
+                            placeholder="Suchen..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            className="input pl-10"
+                        />
+                        <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+
+                {returnTo && (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
+                        <span>
+                            <strong>Auswahl-Modus:</strong> Doppelklicken Sie auf einen Eintrag, um ihn auszuwählen.
+                        </span>
+                        <button
+                            onClick={() => window.location.href = returnTo}
+                            className="text-sm underline hover:no-underline"
+                        >
+                            Abbrechen
+                        </button>
+                    </div>
+                )}
+
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-50 sticky top-0 z-10">
                             <tr>
-                                <th>Name</th>
-                                <th>Typ</th>
-                                {activeTab === 'drittbeteiligter' && <th>Rolle</th>}
-                                <th>Telefon</th>
-                                <th>Email</th>
-                                <th>Adresse</th>
-                                <th className="text-right">Aktionen</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Name</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Straße</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">PLZ</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Stadt</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Kontakt</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Typ</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right">Aktionen</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={activeTab === 'drittbeteiligter' ? 7 : 6} className="text-center py-8">
-                                        Lade Daten...
+                        <tbody className="divide-y divide-slate-200">
+                            {getCurrentData().map((item) => (
+                                <tr
+                                    key={item.id}
+                                    onDoubleClick={() => handleDoubleClick(item)}
+                                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                >
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-slate-900">
+                                            {activeTab === 'mandant' ? (
+                                                item.ansprache === 'Firma' ? item.vorname : `${item.vorname} ${item.nachname}`
+                                            ) : (
+                                                item.name
+                                            )}
+                                        </div>
+                                        {activeTab === 'mandant' && item.ansprache === 'Firma' && (
+                                            <div className="text-xs text-slate-500">AP: {item.nachname}</div>
+                                        )}
                                     </td>
-                                </tr>
-                            ) : getCurrentData().length === 0 ? (
-                                <tr>
-                                    <td colSpan={activeTab === 'drittbeteiligter' ? 7 : 6} className="text-center py-8 text-slate-500">
-                                        Keine Einträge vorhanden
+                                    <td className="px-6 py-4 text-slate-600">
+                                        {item.strasse ? (
+                                            <div>{item.strasse} {item.hausnummer}</div>
+                                        ) : (
+                                            <div>{item.adresse?.split('\n')[0] || '-'}</div>
+                                        )}
                                     </td>
-                                </tr>
-                            ) : (
-                                getCurrentData().map((item) => (
-                                    <tr
-                                        key={item.id}
-                                        className={`hover:bg-slate-50 transition-colors ${returnTo || (mode === 'select' && activeTab === 'drittbeteiligter') ? 'cursor-pointer' : ''}`}
-                                        onDoubleClick={() => handleDoubleClick(item)}
-                                    >
-                                        <td className="font-semibold">
-                                            {item.name}
-                                        </td>
-                                        <td>{item.typ}</td>
-                                        {activeTab === 'drittbeteiligter' && <td>{item.rolle || '-'}</td>}
-                                        <td>{item.telefon || '-'}</td>
-                                        <td>{item.email || '-'}</td>
-                                        <td className="text-sm text-slate-600">{item.adresse || '-'}</td>
-                                        <td className="text-right">
+                                    <td className="px-6 py-4 text-slate-600">
+                                        {item.plz || '-'}
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-600">
+                                        {item.stadt || (item.adresse?.split('\n')[1]?.split(' ')[1] || '-')}
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-600">
+                                        {item.telefon && <div className="flex items-center gap-2"><span className="text-xs text-slate-400">Tel:</span> {item.telefon}</div>}
+                                        {item.email && <div className="flex items-center gap-2"><span className="text-xs text-slate-400">Mail:</span> {item.email}</div>}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                      ${item.typ === 'Person' || item.ansprache === 'Herr' || item.ansprache === 'Frau' ? 'bg-blue-100 text-blue-800' :
+                                                item.typ === 'Unternehmen' || item.ansprache === 'Firma' ? 'bg-purple-100 text-purple-800' :
+                                                    'bg-amber-100 text-amber-800'}`}>
+                                            {item.typ || item.ansprache}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-2">
                                             <button
-                                                onClick={() => handleEdit(item)}
-                                                className="text-primary hover:text-primary-dark font-semibold text-sm mr-3"
+                                                onClick={(e) => { e.stopPropagation(); handleEdit(item); }}
+                                                className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                                title="Bearbeiten"
                                             >
-                                                Bearbeiten
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(item.id, activeTab)}
-                                                className="text-red-600 hover:text-red-800 font-semibold text-sm"
+                                                onClick={(e) => { e.stopPropagation(); handleDelete(item.id, activeTab); }}
+                                                className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                                title="Löschen"
                                             >
-                                                Löschen
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
                                             </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">
-                            {editingItem ? 'Bearbeiten' : 'Neu anlegen'}
-                        </h3>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Name *</label>
-                                <input
-                                    type="text"
-                                    value={formData.name || ''}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Typ</label>
-                                <select
-                                    value={formData.typ || 'Person'}
-                                    onChange={(e) => setFormData({ ...formData, typ: e.target.value })}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    <option value="Person">Natürliche Person</option>
-                                    <option value="Firma">Firma</option>
-                                    <option value="Versicherung">Versicherung</option>
-                                </select>
-                            </div>
-
-                            {activeTab === 'drittbeteiligter' && (
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Rolle</label>
-                                    <input
-                                        type="text"
-                                        value={formData.rolle || ''}
-                                        onChange={(e) => setFormData({ ...formData, rolle: e.target.value })}
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Adresse</label>
-                                <textarea
-                                    value={formData.adresse || ''}
-                                    onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px]"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Telefon</label>
-                                    <input
-                                        type="text"
-                                        value={formData.telefon || ''}
-                                        onChange={(e) => setFormData({ ...formData, telefon: e.target.value })}
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
-                                    <input
-                                        type="email"
-                                        value={formData.email || ''}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                            </div>
-
-                            {activeTab === 'drittbeteiligter' ? (
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Notizen</label>
-                                    <textarea
-                                        value={formData.notizen || ''}
-                                        onChange={(e) => setFormData({ ...formData, notizen: e.target.value })}
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px]"
-                                    />
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Bankverbindung</label>
-                                    <textarea
-                                        value={formData.bankverbindung || ''}
-                                        onChange={(e) => setFormData({ ...formData, bankverbindung: e.target.value })}
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px]"
-                                    />
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="btn btn-secondary"
-                                >
-                                    Abbrechen
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    className="btn btn-primary"
-                                >
-                                    Speichern
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Role Selection Modal */}
-            {showRoleModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Rolle festlegen</h3>
-                        <p className="text-slate-600 mb-4">
-                            Bitte geben Sie die Rolle für <strong>{selectedForRole?.name}</strong> in dieser Akte an.
-                        </p>
-
-                        <div className="mb-6">
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Rolle (optional)</label>
-                            <input
-                                type="text"
-                                value={roleInput}
-                                onChange={(e) => setRoleInput(e.target.value)}
-                                placeholder="z.B. Zeuge, Gutachter..."
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                autoFocus
-                                onKeyDown={(e) => e.key === 'Enter' && handleRoleSubmit()}
-                            />
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-slate-900">
+                                {editingItem ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}
+                            </h3>
+                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                         </div>
 
-                        <div className="flex justify-end gap-3">
+                        <div className="p-6 overflow-y-auto">
+                            <div className="grid grid-cols-1 gap-6">
+                                {/* Mandant Specific Fields */}
+                                {activeTab === 'mandant' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-2">Ansprache</label>
+                                            <div className="flex gap-4">
+                                                {['Herr', 'Frau', 'Firma'].map((option) => (
+                                                    <label key={option} className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="ansprache"
+                                                            value={option}
+                                                            checked={formData.ansprache === option}
+                                                            onChange={(e) => setFormData({ ...formData, ansprache: e.target.value })}
+                                                            className="text-primary focus:ring-primary"
+                                                        />
+                                                        <span className="text-sm text-slate-700">{option}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                                                    {formData.ansprache === 'Firma' ? 'Firmenname' : 'Vorname'}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.vorname || ''}
+                                                    onChange={(e) => setFormData({ ...formData, vorname: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                                                    {formData.ansprache === 'Firma' ? 'Ansprechpartner' : 'Nachname'}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.nachname || ''}
+                                                    onChange={(e) => setFormData({ ...formData, nachname: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Gegner Specific Fields */}
+                                {activeTab === 'gegner' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Name / Firma</label>
+                                            <input
+                                                type="text"
+                                                value={formData.name || ''}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                className="input"
+                                            />
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Common Address Fields (Mandant & Gegner) */}
+                                {(activeTab === 'mandant' || activeTab === 'gegner') && (
+                                    <>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="col-span-2">
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Straße</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.strasse || ''}
+                                                    onChange={(e) => setFormData({ ...formData, strasse: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Nr.</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.hausnummer || ''}
+                                                    onChange={(e) => setFormData({ ...formData, hausnummer: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">PLZ</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.plz || ''}
+                                                    onChange={(e) => setFormData({ ...formData, plz: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Stadt</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.stadt || ''}
+                                                    onChange={(e) => setFormData({ ...formData, stadt: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Land</label>
+                                            <input
+                                                type="text"
+                                                value={formData.land || ''}
+                                                onChange={(e) => setFormData({ ...formData, land: e.target.value })}
+                                                className="input"
+                                            />
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Drittbeteiligter Legacy Fields */}
+                                {activeTab === 'drittbeteiligter' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Name</label>
+                                            <input
+                                                type="text"
+                                                value={formData.name || ''}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                className="input"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Adresse</label>
+                                            <textarea
+                                                rows={3}
+                                                value={formData.adresse || ''}
+                                                onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                                                className="input"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Rolle</label>
+                                            <input
+                                                type="text"
+                                                value={formData.rolle || ''}
+                                                onChange={(e) => setFormData({ ...formData, rolle: e.target.value })}
+                                                className="input"
+                                                placeholder="z.B. Zeuge, Gutachter"
+                                            />
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Contact Fields (Common) */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Telefon</label>
+                                        <input
+                                            type="tel"
+                                            value={formData.telefon || ''}
+                                            onChange={(e) => setFormData({ ...formData, telefon: e.target.value })}
+                                            className="input"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">E-Mail</label>
+                                        <input
+                                            type="email"
+                                            value={formData.email || ''}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className="input"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Mandant Extra Fields */}
+                                {activeTab === 'mandant' && (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Bankverbindung</label>
+                                                <textarea
+                                                    rows={1}
+                                                    value={formData.bankverbindung || ''}
+                                                    onChange={(e) => setFormData({ ...formData, bankverbindung: e.target.value })}
+                                                    className="input resize-none"
+                                                    placeholder="IBAN / BIC"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Notizen</label>
+                                                <textarea
+                                                    rows={1}
+                                                    value={formData.notizen || ''}
+                                                    onChange={(e) => setFormData({ ...formData, notizen: e.target.value })}
+                                                    className="input resize-none"
+                                                    placeholder="Interne Notizen"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-3 pt-2">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.rechtsschutz || false}
+                                                    onChange={(e) => setFormData({ ...formData, rechtsschutz: e.target.checked })}
+                                                    className="rounded text-primary focus:ring-primary"
+                                                />
+                                                <span className="text-sm font-medium text-slate-700">Rechtsschutzversicherung vorhanden</span>
+                                            </label>
+
+                                            {formData.rechtsschutz && (
+                                                <div className="pl-6">
+                                                    <input
+                                                        type="text"
+                                                        value={formData.rechtsschutz_bei || ''}
+                                                        onChange={(e) => setFormData({ ...formData, rechtsschutz_bei: e.target.value })}
+                                                        className="input text-sm"
+                                                        placeholder="Versicherungsgesellschaft / Nummer"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.vst_berechtigt || false}
+                                                    onChange={(e) => setFormData({ ...formData, vst_berechtigt: e.target.checked })}
+                                                    className="rounded text-primary focus:ring-primary"
+                                                />
+                                                <span className="text-sm font-medium text-slate-700">Vorsteuerabzugsberechtigt</span>
+                                            </label>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
                             <button
-                                onClick={() => setShowRoleModal(false)}
+                                onClick={() => setShowModal(false)}
                                 className="btn btn-secondary"
                             >
                                 Abbrechen
                             </button>
                             <button
-                                onClick={handleRoleSubmit}
+                                onClick={handleSave}
                                 className="btn btn-primary"
                             >
-                                Auswählen
+                                Speichern
                             </button>
                         </div>
                     </div>
@@ -507,15 +664,15 @@ const Stammdaten: React.FC = () => {
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Eintrag löschen</h3>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-lg font-bold text-slate-900 mb-2">Eintrag löschen?</h3>
                         <p className="text-slate-600 mb-6">
                             Möchten Sie diesen Eintrag wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
                         </p>
 
                         {deleteError && (
-                            <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
+                            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
                                 {deleteError}
                             </div>
                         )}
@@ -529,7 +686,7 @@ const Stammdaten: React.FC = () => {
                             </button>
                             <button
                                 onClick={confirmDelete}
-                                className="btn btn-error"
+                                className="btn bg-red-600 text-white hover:bg-red-700"
                             >
                                 Löschen
                             </button>
