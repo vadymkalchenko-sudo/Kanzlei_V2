@@ -159,12 +159,19 @@ const AkteForm: React.FC = () => {
       if (!finalGegnerId && formData.gegner.name) {
         // First check if a Gegner with this name already exists
         try {
-          const searchRes = await api.get(`gegner/search/?q=${encodeURIComponent(formData.gegner.name)}`);
-          const existingGegner = searchRes.data.find((g: any) => g.name.toLowerCase() === formData.gegner.name.toLowerCase());
+          const searchName = formData.gegner.name.trim();
+          const searchRes = await api.get(`gegner/search/?q=${encodeURIComponent(searchName)}`);
+
+          // Find exact match (case-insensitive)
+          const existingGegner = searchRes.data.find((g: any) =>
+            g.name.trim().toLowerCase() === searchName.toLowerCase()
+          );
 
           if (existingGegner) {
+            console.log("Found existing Gegner:", existingGegner);
             finalGegnerId = existingGegner.id;
           } else {
+            console.log("Creating new Gegner:", formData.gegner);
             const gegnerResponse = await api.post(`gegner/`, formData.gegner);
             finalGegnerId = gegnerResponse.data.id;
           }
