@@ -11,6 +11,14 @@ interface OrganizerItem {
   typ?: 'Aufgabe' | 'Frist' | 'Notiz';
   faellig_am?: string;
   erstellt_am?: string;
+  zugewiesen_an?: number | null;
+}
+
+interface User {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
 }
 
 interface OrganizerTabsProps {
@@ -20,8 +28,9 @@ interface OrganizerTabsProps {
 const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
   const [activeTab, setActiveTab] = useState<'Aufgabe' | 'Frist' | 'Notiz'>('Aufgabe');
   const [items, setItems] = useState<OrganizerItem[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newItem, setNewItem] = useState<OrganizerItem>({ titel: '', beschreibung: '', status: 'offen' });
+  const [newItem, setNewItem] = useState<OrganizerItem>({ titel: '', beschreibung: '', status: 'offen', zugewiesen_an: null });
 
   const fetchItems = async () => {
     try {
@@ -35,9 +44,19 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get('users/');
+      setUsers(response.data);
+    } catch (err) {
+      console.error("Fehler beim Laden der Benutzer", err);
+    }
+  };
+
   useEffect(() => {
     if (akteId) {
       fetchItems();
+      fetchUsers();
     }
   }, [akteId]);
 
@@ -53,6 +72,12 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
       if (activeTab === 'Aufgabe') {
         endpoint = 'organizer/aufgaben/';
         payload.status = newItem.status?.toLowerCase() || 'offen';
+        if (newItem.datum) {
+          payload.faellig_am = newItem.datum;
+        }
+        if (newItem.zugewiesen_an) {
+          payload.zugewiesen_an = newItem.zugewiesen_an;
+        }
       } else if (activeTab === 'Frist') {
         endpoint = 'organizer/fristen/';
         payload.bezeichnung = newItem.titel;
@@ -71,7 +96,7 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
       await api.post(endpoint, payload);
 
       // Reset form and refresh list
-      setNewItem({ titel: '', beschreibung: '', datum: '', status: 'offen' });
+      setNewItem({ titel: '', beschreibung: '', datum: '', status: 'offen', zugewiesen_an: null });
       fetchItems();
     } catch (err: any) {
       console.error(`Fehler beim Erstellen von ${activeTab}`, err);
@@ -79,6 +104,81 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
       const errorMsg = err.response?.data ? JSON.stringify(err.response.data) : err.message;
       alert(`Fehler beim Erstellen: ${errorMsg}`);
     }
+  };
+
+  const handleDelete = async (itemId: number) => {
+    try {
+      let endpoint = '';
+      if (activeTab === 'Aufgabe') {
+        endpoint = `organizer/aufgaben/${itemId}/`;
+      } else if (activeTab === 'Frist') {
+        endpoint = `organizer/fristen/${itemId}/`;
+      } else if (activeTab === 'Notiz') {
+        endpoint = `organizer/notizen/${itemId}/`;
+      }
+
+      console.log(`Deleting ${activeTab} ${itemId}`);
+      await api.delete(endpoint);
+      console.log(`${activeTab} ${itemId} deleted successfully`);
+      fetchItems();
+    } catch (err) {
+      console.error(`Fehler beim Löschen von ${activeTab}`, err);
+      alert(`Fehler beim Löschen.`);
+    }
+  };
+
+  const handleEdit = async (item: OrganizerItem) => {
+    // TODO: Implement proper edit modal instead of window.prompt
+    console.log('Edit clicked for item:', item);
+    alert(`Bearbeiten-Funktion für "${item.titel}" wird noch implementiert. Bitte verwenden Sie vorerst "Löschen" und neu erstellen.`);
+
+    /* Original code with prompts - disabled because prompts are blocked
+    const newTitle = window.prompt('Neuer Titel:', item.titel);
+    if (!newTitle) return;
+
+    const newDescription = window.prompt('Neue Beschreibung:', item.beschreibung);
+    if (newDescription === null) return;
+
+    try {
+      let endpoint = '';
+      let payload: any = {};
+
+      if (activeTab === 'Aufgabe') {
+        endpoint = `organizer/aufgaben/${item.id}/`;
+        payload = {
+          akte: akteId,
+          titel: newTitle,
+          beschreibung: newDescription,
+          status: item.status?.toLowerCase() || 'offen',
+          faellig_am: item.faellig_am || item.datum,
+          zugewiesen_an: item.zugewiesen_an,
+        };
+      } else if (activeTab === 'Frist') {
+        endpoint = `organizer/fristen/${item.id}/`;
+        payload = {
+          akte: akteId,
+          bezeichnung: newTitle,
+          beschreibung: newDescription,
+          frist_datum: item.datum || new Date().toISOString().split('T')[0],
+          prioritaet: 'mittel',
+          erledigt: false,
+        };
+      } else if (activeTab === 'Notiz') {
+        endpoint = `organizer/notizen/${item.id}/`;
+        payload = {
+          akte: akteId,
+          titel: newTitle,
+          inhalt: newDescription,
+        };
+      }
+
+      await api.put(endpoint, payload);
+      fetchItems();
+    } catch (err) {
+      console.error(`Fehler beim Bearbeiten von ${activeTab}`, err);
+      alert(`Fehler beim Bearbeiten.`);
+    }
+    */
   };
 
   const filteredItems = items.filter(item => item.typ === activeTab);
@@ -116,9 +216,11 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
             />
           </div>
 
-          {activeTab === 'Frist' && (
+          {(activeTab === 'Frist' || activeTab === 'Aufgabe') && (
             <div className="w-full md:w-40">
-              <label className="block text-xs font-medium text-slate-500 mb-1">Datum</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                {activeTab === 'Frist' ? 'Frist-Datum' : 'Fällig am'}
+              </label>
               <input
                 type="date"
                 className="input w-full"
@@ -140,17 +242,34 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
           </div>
 
           {activeTab === 'Aufgabe' && (
-            <div className="w-full md:w-32">
-              <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
-              <select
-                className="input w-full"
-                value={newItem.status || 'offen'}
-                onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
-              >
-                <option value="offen">Offen</option>
-                <option value="erledigt">Erledigt</option>
-              </select>
-            </div>
+            <>
+              <div className="w-full md:w-32">
+                <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+                <select
+                  className="input w-full"
+                  value={newItem.status || 'offen'}
+                  onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
+                >
+                  <option value="offen">Offen</option>
+                  <option value="erledigt">Erledigt</option>
+                </select>
+              </div>
+              <div className="w-full md:w-40">
+                <label className="block text-xs font-medium text-slate-500 mb-1">Zugewiesen an</label>
+                <select
+                  className="input w-full"
+                  value={newItem.zugewiesen_an || ''}
+                  onChange={(e) => setNewItem({ ...newItem, zugewiesen_an: e.target.value ? parseInt(e.target.value) : null })}
+                >
+                  <option value="">Nicht zugewiesen</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
           )}
 
           <button onClick={handleAddItem} className="btn btn-primary whitespace-nowrap h-[38px]">
@@ -165,7 +284,11 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
           <thead>
             <tr>
               <th style={{ width: '25%' }}>Titel</th>
-              {activeTab === 'Frist' && <th style={{ width: '15%' }}>Datum</th>}
+              {(activeTab === 'Frist' || activeTab === 'Aufgabe') && (
+                <th style={{ width: '15%' }}>
+                  {activeTab === 'Frist' ? 'Frist-Datum' : 'Fällig am'}
+                </th>
+              )}
               <th>Beschreibung</th>
               <th style={{ width: '10%' }}>Status</th>
               <th style={{ width: '15%', textAlign: 'right' }}>Aktionen</th>
@@ -176,7 +299,7 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
               filteredItems.map((item) => (
                 <tr key={item.id}>
                   <td className="font-medium">{item.titel}</td>
-                  {activeTab === 'Frist' && <td>{item.datum || '-'}</td>}
+                  {(activeTab === 'Frist' || activeTab === 'Aufgabe') && <td>{item.datum || item.faellig_am || '-'}</td>}
                   <td className="text-slate-500 text-sm truncate max-w-xs">{item.beschreibung}</td>
                   <td>
                     {item.typ !== 'Notiz' && (
@@ -187,8 +310,18 @@ const OrganizerTabs: React.FC<OrganizerTabsProps> = ({ akteId }) => {
                   </td>
                   <td className="text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="text-xs text-primary hover:underline">Bearbeiten</button>
-                      <button className="text-xs text-red-600 hover:underline">Löschen</button>
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Bearbeiten
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id!)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Löschen
+                      </button>
                     </div>
                   </td>
                 </tr>

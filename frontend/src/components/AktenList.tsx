@@ -15,6 +15,9 @@ const AktenList = () => {
     const [akten, setAkten] = useState<Akte[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [akteToDelete, setAkteToDelete] = useState<number | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchAkten = async () => {
@@ -31,11 +34,31 @@ const AktenList = () => {
         fetchAkten();
     }, []);
 
+    const handleDelete = (id: number) => {
+        setAkteToDelete(id);
+        setDeleteError(null);
+        setShowDeleteModal(true);
+    };
+    const confirmDelete = async () => {
+        if (akteToDelete === null) return;
+        try {
+            await api.delete(`akten/${akteToDelete}/`);
+            setAkten(akten.filter(akte => akte.id !== akteToDelete));
+            setShowDeleteModal(false);
+            setAkteToDelete(null);
+        } catch (error) {
+            console.error('Fehler beim Löschen der Akte:', error);
+            setDeleteError('Fehler beim Löschen der Akte.');
+        }
+    };
+
     const filteredAkten = akten.filter(akte =>
         akte.aktenzeichen.toLowerCase().includes(searchQuery.toLowerCase()) ||
         akte.mandant?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         akte.gegner?.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+
 
     const getStatusBadgeClass = (status: string) => {
         switch (status.toLowerCase()) {
@@ -118,13 +141,19 @@ const AktenList = () => {
                                         <td className="text-slate-500">
                                             {new Date(akte.erstellt_am).toLocaleDateString('de-DE')}
                                         </td>
-                                        <td className="text-right">
+                                        <td className="text-right space-x-2">
                                             <Link
                                                 to={`/akte/${akte.id}`}
                                                 className="text-primary hover:text-primary-dark font-semibold text-sm"
                                             >
                                                 Bearbeiten
                                             </Link>
+                                            <button
+                                                onClick={() => { console.log('Delete button clicked for Akte', akte.id); handleDelete(akte.id); }}
+                                                className="text-red-500 hover:text-red-700 font-semibold text-sm"
+                                            >
+                                                Löschen
+                                            </button>
                                         </td>
                                     </tr>
                                 ))

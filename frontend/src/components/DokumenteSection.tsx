@@ -163,11 +163,10 @@ const DokumenteSection = ({ akteId }: { akteId: string | number }) => {
     };
 
     const handleDelete = async (docId: number) => {
-        if (!window.confirm("Möchten Sie dieses Dokument wirklich löschen?")) {
-            return;
-        }
         try {
+            console.log(`Deleting document ${docId}`);
             await api.delete(`dokumente/${docId}/`);
+            console.log(`Document ${docId} deleted successfully`);
             fetchDokumente();
         } catch (err) {
             console.error("Fehler beim Löschen", err);

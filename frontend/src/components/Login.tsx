@@ -21,7 +21,7 @@ const Login = () => {
                 username,
                 password
             });
-            console.log("Login Success. Token:", response.data.access);
+
 
             login(response.data.access);
             navigate('/dashboard');

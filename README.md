@@ -25,21 +25,43 @@ Das Backend der Kanzlei-Software basiert auf Django und ist in mehrere Apps unte
 *   **JSONB-Datenstruktur:** Flexible und erweiterbare Speicherung von Akteninformationen
 *   **JWT-Authentifizierung:** Sichere Benutzerauthentifizierung mittels JSON Web Tokens
 *   **Rollenbasierte Berechtigungen:** Admin, Sachbearbeiter, Mandant mit entsprechenden Zugriffsrechten
-*   **Finanz-CRUD:** Vollständige Verwaltung von Finanzdaten
+*   **Finanz-CRUD:** Vollständige Verwaltung von Finanzdaten (SOLL/HABEN)
 *   **Dokumenten-Management:** Upload, Download, Bearbeitung und Löschung von Dokumenten
 *   **Dashboard-API:** Priorisierte Fristen mit Aktenzeichen und Tage-bis-Frist-Berechnung
+*   **Organizer-System:** Aufgaben, Fristen und Notizen pro Akte
+*   **User-API:** Benutzerverwaltung für Aufgabenzuordnung
+*   **Backup/Restore:** Datenbank-Export und -Import über Admin-Panel
 
 ### Frontend
 *   **Moderne React-UI:** Responsives Design mit Tailwind CSS
+*   **Aktenverwaltung:**
+    - Akten erstellen, bearbeiten und löschen
+    - Stammdaten-Verwaltung (Mandanten, Gegner, Drittbeteiligte)
+    - Suchfunktion über Aktenzeichen, Mandant und Gegner
+    - Akten schließen mit Historisierung
 *   **Dokumenten-Verwaltung:**
     - Drag & Drop Upload
     - Inline-Bearbeitung (Titel & Datum)
     - Direktes Öffnen von PDFs im Browser
+    - Download-Funktion
     - Löschen-Funktion mit Bestätigung
     - Automatische Listen-Aktualisierung
-*   **Dashboard:** Übersicht über offene Aufgaben und Fristen
-*   **Benachrichtigungen:** Echtzeit-Anzeige priorisierter Fristen
-*   **Organizer:** Aufgaben, Fristen und Notizen pro Akte
+*   **Organizer:**
+    - **Aufgaben:** Mit Status, Fälligkeitsdatum und Benutzerzuordnung
+    - **Fristen:** Mit Priorität und Erledigungsstatus
+    - **Notizen:** Freie Textnotizen pro Akte
+    - Bearbeiten und Löschen aller Einträge
+*   **Finanzen:**
+    - SOLL/HABEN Buchungen
+    - Automatische Saldierung
+    - Verknüpfung mit Dokumenten
+*   **Dashboard:** 
+    - Übersicht über offene Aufgaben und Fristen
+    - Schnellzugriff auf letzte Akten
+    - Benachrichtigungen über fällige Fristen
+*   **Admin-Panel:**
+    - Datenbank-Backup erstellen
+    - Datenbank-Restore aus Backup
 
 ## Setup-Anleitung
 

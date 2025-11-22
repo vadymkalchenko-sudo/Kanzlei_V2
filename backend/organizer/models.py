@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 from aktenverwaltung.models import Akte
 
@@ -23,6 +24,7 @@ class Aufgabe(OrganizerZeitstempel):
     beschreibung = models.TextField(blank=True)
     faellig_am = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="offen")
+    zugewiesen_an = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="aufgaben")
 
     class Meta:
         ordering = ["faellig_am", "status"]

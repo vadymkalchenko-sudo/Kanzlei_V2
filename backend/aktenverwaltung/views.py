@@ -16,6 +16,7 @@ from organizer.models import Aufgabe, Frist
 
 from .db_connector import write_akte_data
 from .models import Akte, Dokument, Mandant, Gegner, Drittbeteiligter
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .permissions import IsAdminOrReadWriteUser
 from .serializers import AkteDashboardSerializer, AkteSerializer, DokumentSerializer, MandantSerializer, GegnerSerializer, DrittbeteiligterSerializer
 from .storage import store_document
@@ -507,3 +508,69 @@ class DokumentViewSet(viewsets.ModelViewSet):
         # Optional: Delete file from filesystem here if needed
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- Backup ViewSet ---
+import tempfile
+import os
+from django.core.management import call_command
+from django.http import FileResponse
+from rest_framework.parsers import MultiPartParser, FormParser
+
+class BackupViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated] # Or IsAdminUser
+    parser_classes = (MultiPartParser, FormParser)
+
+    @action(detail=False, methods=['get'])
+    def export_db(self, request):
+        """
+        Exports the entire database to a JSON file.
+        """
+        try:
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.json', encoding='utf-8') as tmp:
+                # Dump data excluding contenttypes and sessions to avoid issues
+                call_command(
+                    'dumpdata', 
+                    exclude=['contenttypes', 'sessions', 'auth.permission', 'admin.logentry'], 
+                    indent=2, 
+                    stdout=tmp
+                )
+                tmp_path = tmp.name
+            
+            response = FileResponse(open(tmp_path, 'rb'), as_attachment=True, filename='kanzlei_backup.json')
+            return response
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=False, methods=['post'])
+    def import_db(self, request):
+        """
+        Imports a JSON backup file. WARNING: Overwrites/Merges data.
+        """
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'Keine Datei ausgewählt'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        tmp_path = None
+        try:
+            # Save uploaded file to temp
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tmp:
+                for chunk in file_obj.chunks():
+                    tmp.write(chunk)
+                tmp_path = tmp.name
+            
+            # Load data
+            call_command('loaddata', tmp_path)
+            
+            return Response({'status': 'Backup erfolgreich wiederhergestellt'}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'error': f"Fehler beim Import: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
